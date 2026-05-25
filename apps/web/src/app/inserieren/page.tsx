@@ -15,15 +15,6 @@ import { useAuth } from '@/context/AuthContext';
 import { BeerUnit, ItemCondition } from '@/types';
 import { fetchPaymentUnits } from '@/lib/paymentSettings';
 
-const CATEGORY_IMAGES: Record<string, string> = {
-  moebel: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=600&auto=format&fit=crop",
-  elektronik: "https://images.unsplash.com/photo-1468495244123-6c6c332eeece?w=600&auto=format&fit=crop",
-  kleidung: "https://images.unsplash.com/photo-1489987707025-afc232f7ea0f?w=600&auto=format&fit=crop",
-  fahrzeuge: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=600&auto=format&fit=crop",
-  haushalt: "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=600&auto=format&fit=crop",
-  sport: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=600&auto=format&fit=crop",
-  sonstiges: "https://images.unsplash.com/photo-1567696911980-2eed69a46042?w=600&auto=format&fit=crop"
-};
 
 export default function InserierenPage() {
   const router = useRouter();
@@ -119,16 +110,10 @@ export default function InserierenPage() {
 
       // 1. Upload Images to Firebase Storage
       for (const image of images) {
-        try {
-          const imageRef = ref(storage, `listings/${listingId}/${uuidv4()}_${image.name}`);
-          const snapshot = await uploadBytes(imageRef, image);
-          const downloadUrl = await getDownloadURL(snapshot.ref);
-          uploadedImageUrls.push(downloadUrl);
-        } catch (storageErr: any) {
-          console.warn("Storage upload failed, falling back to mock placeholder image:", storageErr);
-          const categoryImg = CATEGORY_IMAGES[category] || CATEGORY_IMAGES.sonstiges;
-          uploadedImageUrls.push(categoryImg);
-        }
+        const imageRef = ref(storage, `listings/${listingId}/${uuidv4()}_${image.name}`);
+        const snapshot = await uploadBytes(imageRef, image);
+        const downloadUrl = await getDownloadURL(snapshot.ref);
+        uploadedImageUrls.push(downloadUrl);
       }
 
       // 2. Save Listing to Firestore
