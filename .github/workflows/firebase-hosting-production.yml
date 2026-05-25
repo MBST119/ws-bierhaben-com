@@ -1,0 +1,21 @@
+name: Deploy to Firebase Hosting on Production
+on:
+  push:
+    branches:
+      - production
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci && npm run build
+        env:
+          NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY_PROD || secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BIERHABEN_COM_PROD }}
+          channelId: live
+          projectId: bierhaben-com-prod
