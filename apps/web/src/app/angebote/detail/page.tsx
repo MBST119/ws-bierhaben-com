@@ -9,7 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { MessageSquare, ArrowLeft, ShieldCheck, Heart } from 'lucide-react';
 import Link from 'next/link';
 import { Listing, UserProfile } from '@/types';
-import { FALLBACK_LISTINGS } from '@/lib/fallbacks';
+
 
 export default function InseratDetailPage() {
   const { user, userProfile } = useAuth();
@@ -45,13 +45,7 @@ export default function InseratDetailPage() {
         if (docSnap.exists()) {
           loadedListing = { id: docSnap.id, ...docSnap.data() } as Listing;
         } else {
-          // Check if it matches a fallback listing
-          const fallback = FALLBACK_LISTINGS.find(item => item.id === listingId);
-          if (fallback) {
-            loadedListing = fallback;
-          } else {
-            console.log("No such listing document nor fallback!");
-          }
+          console.log("No such listing document!");
         }
 
         if (loadedListing) {
@@ -89,11 +83,6 @@ export default function InseratDetailPage() {
         }
       } catch (error) {
         console.error("Error fetching listing:", error);
-        // Fallback safety
-        const fallback = FALLBACK_LISTINGS.find(item => item.id === listingId);
-        if (fallback) {
-          setListing(fallback);
-        }
       } finally {
         setLoading(false);
       }
