@@ -53,7 +53,7 @@ export default function LoginPage() {
         try {
           container.innerHTML = '';
           (window as any).grecaptcha.render('recaptcha-container', {
-            sitekey: '6LeGxAcTAAAAALqEwTR8_gZnJqTo1A_4bON4_KzS', // Google's public test key
+            sitekey: '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI', // Google's public test key for checkbox v2
             callback: (token: string) => {
               setRecaptchaToken(token);
             },
