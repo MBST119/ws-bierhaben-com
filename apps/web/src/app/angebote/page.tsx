@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Listing } from '@/types';
-import { FALLBACK_LISTINGS } from '@/lib/fallbacks';
+
 
 function AngeboteContent() {
   const searchParams = useSearchParams();
@@ -44,13 +44,13 @@ function AngeboteContent() {
           });
 
         if (activeListings.length === 0) {
-          setListings(FALLBACK_LISTINGS);
+          setListings([]);
         } else {
           setListings(activeListings);
         }
       } catch (error) {
         console.error("Fehler beim Laden der Inserate:", error);
-        setListings(FALLBACK_LISTINGS);
+        setListings([]);
       } finally {
         setLoading(false);
       }

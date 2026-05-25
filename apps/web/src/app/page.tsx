@@ -9,7 +9,7 @@ import { Logo } from '@/components/Logo';
 import { db } from '@/lib/firebaseClient';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Listing } from '@/types';
-import { FALLBACK_LISTINGS } from '@/lib/fallbacks';
+
 
 export default function Home() {
   const [listings, setListings] = useState<Listing[]>([]);
@@ -41,15 +41,14 @@ export default function Home() {
           })
           .slice(0, 8); // Display top 8 listings on homepage
 
-        // If no listings in DB, load fallback listings
         if (activeListings.length === 0) {
-          setListings(FALLBACK_LISTINGS);
+          setListings([]);
         } else {
           setListings(activeListings);
         }
       } catch (err) {
         console.error('Error fetching listings:', err);
-        setListings(FALLBACK_LISTINGS);
+        setListings([]);
       } finally {
         setLoading(false);
       }
