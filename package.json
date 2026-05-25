@@ -15,6 +15,7 @@
     "apps/*"
   ],
   "dependencies": {
-    "firebase": "^12.13.0"
+    "firebase": "^12.13.0",
+    "firebase-admin": "^12.7.0"
   }
 }

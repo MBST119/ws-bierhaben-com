@@ -13,6 +13,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/context/AuthContext';
 import { BeerUnit, ItemCondition } from '@/types';
+import { fetchPaymentUnits } from '@/lib/paymentSettings';
 
 const CATEGORY_IMAGES: Record<string, string> = {
   moebel: "https://images.unsplash.com/photo-1524758631624-e2822e304c36?w=600&auto=format&fit=crop",
@@ -38,14 +39,43 @@ export default function InserierenPage() {
   const [unit, setUnit] = useState<BeerUnit>('flasche');
   const [condition, setCondition] = useState<ItemCondition | ''>('');
   const [images, setImages] = useState<File[]>([]);
+  const [availableUnits, setAvailableUnits] = useState<string[]>(['flasche', 'kiste', 'dose', 'andere']);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchPaymentUnits().then((fetched) => {
+      setAvailableUnits(fetched);
+      if (fetched.length > 0 && !fetched.includes(unit)) {
+        setUnit(fetched[0] as BeerUnit);
+      }
+    });
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push('/login');
     }
   }, [user, loading, router]);
+
+  if (!loading && user && !user.emailVerified) {
+    return (
+      <div className="w-full flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <Info className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-extrabold mb-2">E-Mail-Verifizierung erforderlich</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+          Du musst deine E-Mail-Adresse verifizieren, um neue Inserate erstellen zu können. Bitte klicke auf den Link in der E-Mail, die wir dir gesendet haben.
+        </p>
+        <div className="flex gap-4">
+          <Button onClick={() => router.push('/')} variant="outline" className="rounded-full">
+            Zur Startseite
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -229,13 +259,14 @@ export default function InserierenPage() {
                 id="unit" 
                 value={unit}
                 onChange={(e) => setUnit(e.target.value as BeerUnit)}
-                className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer"
+                className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer capitalize"
                 required
               >
-                <option value="flasche">🍺 Flasche</option>
-                <option value="kiste">🍻 Kiste</option>
-                <option value="dose">🥫 Dose</option>
-                <option value="andere">🥤 Andere</option>
+                {availableUnits.map((u) => (
+                  <option key={u} value={u}>
+                    {u === 'flasche' ? '🍺 Flasche' : u === 'kiste' ? '🍻 Kiste' : u === 'dose' ? '🥫 Dose' : u === 'andere' ? '🥤 Andere' : u}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

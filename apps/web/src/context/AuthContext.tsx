@@ -9,7 +9,9 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  updateProfile
+  updateProfile,
+  sendEmailVerification,
+  reload
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebaseClient';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
@@ -23,6 +25,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,6 +36,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithEmail: async () => {},
   signUpWithEmail: async () => {},
   logout: async () => {},
+  refreshUser: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -107,14 +111,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
     await setDoc(userRef, profileData);
     setUserProfile({ uid: newUser.uid, ...profileData } as any);
+
+    // Send email verification
+    try {
+      await sendEmailVerification(newUser);
+    } catch (verifErr) {
+      console.error("Error sending verification email during sign up:", verifErr);
+    }
   };
 
   const logout = async () => {
     await signOut(auth);
   };
 
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await reload(auth.currentUser);
+      // Force status update on React state
+      setUser({ ...auth.currentUser });
+
+      // Refresh firestore profile too
+      const userRef = doc(db, 'users', auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
+      if (userSnap.exists()) {
+        setUserProfile({ uid: auth.currentUser.uid, ...userSnap.data() } as any);
+      }
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, logout }}>
+    <AuthContext.Provider value={{ user, userProfile, loading, signInWithGoogle, signInWithEmail, signUpWithEmail, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

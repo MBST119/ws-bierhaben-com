@@ -35,6 +35,7 @@ import {
 } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { Listing, BeerUnit, ItemCondition } from '@/types';
+import { fetchPaymentUnits } from '@/lib/paymentSettings';
 
 export default function ProfilPage() {
   const router = useRouter();
@@ -61,6 +62,11 @@ export default function ProfilPage() {
   const [editUnit, setEditUnit] = useState<BeerUnit>('flasche');
   const [editCondition, setEditCondition] = useState<ItemCondition>('gut');
   const [isSavingListing, setIsSavingListing] = useState(false);
+  const [availableUnits, setAvailableUnits] = useState<string[]>(['flasche', 'kiste', 'dose', 'andere']);
+
+  useEffect(() => {
+    fetchPaymentUnits().then(setAvailableUnits);
+  }, []);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -104,6 +110,10 @@ export default function ProfilPage() {
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    if (!user.emailVerified) {
+      setProfileErrorMsg('Bitte verifiziere deine E-Mail-Adresse, um dein Profil zu bearbeiten.');
+      return;
+    }
     setIsSavingProfile(true);
     setProfileSuccessMsg('');
     setProfileErrorMsg('');
@@ -128,6 +138,10 @@ export default function ProfilPage() {
   };
 
   const handleToggleStatus = async (listing: Listing) => {
+    if (user && !user.emailVerified) {
+      alert('Bitte verifiziere deine E-Mail-Adresse, um den Status deines Inserats zu ändern.');
+      return;
+    }
     const newStatus = listing.status === 'open' ? 'offline' : 'open';
     try {
       const listingRef = doc(db, 'listings', listing.id);
@@ -144,6 +158,10 @@ export default function ProfilPage() {
   };
 
   const handleDeleteListing = async (id: string) => {
+    if (user && !user.emailVerified) {
+      alert('Bitte verifiziere deine E-Mail-Adresse, um Inserate zu löschen.');
+      return;
+    }
     if (!confirm("Möchtest du dieses Inserat wirklich unwiderruflich löschen?")) return;
     try {
       const listingRef = doc(db, 'listings', id);
@@ -170,6 +188,10 @@ export default function ProfilPage() {
   const handleSaveListingEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingListing) return;
+    if (user && !user.emailVerified) {
+      alert('Bitte verifiziere deine E-Mail-Adresse, um Inserate zu bearbeiten.');
+      return;
+    }
     setIsSavingListing(true);
 
     try {
@@ -472,12 +494,13 @@ export default function ProfilPage() {
                     id="editUnit" 
                     value={editUnit}
                     onChange={(e) => setEditUnit(e.target.value as BeerUnit)}
-                    className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer"
+                    className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer capitalize"
                   >
-                    <option value="flasche">🍺 Flasche</option>
-                    <option value="kiste">🍻 Kiste</option>
-                    <option value="dose">🥫 Dose</option>
-                    <option value="andere">🥤 Andere</option>
+                    {availableUnits.map((u) => (
+                      <option key={u} value={u}>
+                        {u === 'flasche' ? '🍺 Flasche' : u === 'kiste' ? '🍻 Kiste' : u === 'dose' ? '🥫 Dose' : u === 'andere' ? '🥤 Andere' : u}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

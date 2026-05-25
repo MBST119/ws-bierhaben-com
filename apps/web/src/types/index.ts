@@ -12,6 +12,7 @@ export interface UserProfile {
   createdAt: Timestamp;
   listingsCount?: number;
   exchangesCount?: number;
+  role?: 'superAdmin' | 'user';
 }
 
 export interface Listing {

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogIn, UserPlus } from 'lucide-react';
 
 export default function LoginPage() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
@@ -15,9 +14,69 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState('');
+
+  // Dynamically load Google reCAPTCHA v2 on registration mode
+  useEffect(() => {
+    if (isLogin) {
+      setRecaptchaToken('');
+      return;
+    }
+
+    const loadAndRenderRecaptcha = () => {
+      if ((window as any).grecaptcha) {
+        renderRecaptcha();
+      } else {
+        const existingScript = document.getElementById('recaptcha-script');
+        if (!existingScript) {
+          const script = document.createElement('script');
+          script.id = 'recaptcha-script';
+          script.src = 'https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit';
+          script.async = true;
+          script.defer = true;
+          document.body.appendChild(script);
+
+          (window as any).onloadCallback = () => {
+            renderRecaptcha();
+          };
+        }
+      }
+    };
+
+    const renderRecaptcha = () => {
+      const container = document.getElementById('recaptcha-container');
+      if (container && (window as any).grecaptcha) {
+        try {
+          container.innerHTML = '';
+          (window as any).grecaptcha.render('recaptcha-container', {
+            sitekey: '6LeGxAcTAAAAALqEwTR8_gZnJqTo1A_4bON4_KzS', // Google's public test key
+            callback: (token: string) => {
+              setRecaptchaToken(token);
+            },
+            'expired-callback': () => {
+              setRecaptchaToken('');
+            }
+          });
+        } catch (e) {
+          console.warn("reCAPTCHA rendering issue:", e);
+        }
+      }
+    };
+
+    // Small delay to ensure the container div is mounted before rendering
+    const timer = setTimeout(() => {
+      loadAndRenderRecaptcha();
+    }, 100);
+
+    return () => {
+      clearTimeout(timer);
+      delete (window as any).onloadCallback;
+    };
+  }, [isLogin]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,11 +90,26 @@ export default function LoginPage() {
         if (!name) {
           throw new Error('Bitte gib deinen Namen ein.');
         }
+        if (password !== confirmPassword) {
+          throw new Error('Die Passwörter stimmen nicht überein.');
+        }
+        if (!recaptchaToken) {
+          throw new Error('Bitte bestätige das Re-CAPTCHA.');
+        }
         await signUpWithEmail(email, password, name);
       }
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Ein Fehler ist aufgetreten.');
+      // Reset recaptcha on error
+      if (!isLogin && (window as any).grecaptcha) {
+        try {
+          (window as any).grecaptcha.reset();
+          setRecaptchaToken('');
+        } catch (e) {
+          // ignore reset error
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -102,6 +176,25 @@ export default function LoginPage() {
               required
             />
           </div>
+
+          {!isLogin && (
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Passwort wiederholen</Label>
+              <Input 
+                id="confirmPassword" 
+                type="password" 
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required={!isLogin}
+              />
+            </div>
+          )}
+
+          {!isLogin && (
+            <div className="flex justify-center py-2">
+              <div id="recaptcha-container"></div>
+            </div>
+          )}
 
           <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-white" disabled={loading}>
             {loading ? 'Lädt...' : (isLogin ? 'Anmelden' : 'Registrieren')}

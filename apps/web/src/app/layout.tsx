@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { AuthProvider } from "@/context/AuthContext";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body className={`${inter.className} min-h-screen flex flex-col bg-background text-foreground`} suppressHydrationWarning>
         <AuthProvider>
           <Navbar />
+          <EmailVerificationBanner />
           <main className="flex-1 flex flex-col">
             {children}
           </main>

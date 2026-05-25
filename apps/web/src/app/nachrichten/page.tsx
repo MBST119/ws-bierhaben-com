@@ -18,6 +18,7 @@ import { db, storage } from '@/lib/firebaseClient';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { fetchPaymentUnits } from '@/lib/paymentSettings';
 import { 
   MessageSquare, 
   Clock, 
@@ -29,7 +30,8 @@ import {
   Tag,
   Check,
   X,
-  Paperclip
+  Paperclip,
+  Info
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -81,7 +83,17 @@ export default function NachrichtenPage() {
 
   const [showPriceSuggestion, setShowPriceSuggestion] = useState(false);
   const [suggestedAmount, setSuggestedAmount] = useState('');
-  const [suggestedUnit, setSuggestedUnit] = useState<'flasche' | 'kiste' | 'dose' | 'andere'>('kiste');
+  const [suggestedUnit, setSuggestedUnit] = useState<string>('kiste');
+  const [availableUnits, setAvailableUnits] = useState<string[]>(['flasche', 'kiste', 'dose', 'andere']);
+
+  useEffect(() => {
+    fetchPaymentUnits().then((fetched) => {
+      setAvailableUnits(fetched);
+      if (fetched.length > 0) {
+        setSuggestedUnit(fetched[0]);
+      }
+    });
+  }, []);
 
   const formatTime = (timestamp: any) => {
     if (!timestamp) return '';
@@ -366,12 +378,11 @@ export default function NachrichtenPage() {
 
   const getOfferUnitLabel = (unit: string, amount: number) => {
     const plural = amount > 1;
-    switch (unit) {
-      case 'flasche': return plural ? 'Flaschen' : 'Flasche';
-      case 'kiste': return plural ? 'Kisten' : 'Kiste';
-      case 'dose': return plural ? 'Dosen' : 'Dose';
-      default: return 'Einheiten';
-    }
+    const lowerUnit = unit.toLowerCase();
+    if (lowerUnit === 'flasche') return plural ? 'Flaschen' : 'Flasche';
+    if (lowerUnit === 'kiste') return plural ? 'Kisten' : 'Kiste';
+    if (lowerUnit === 'dose') return plural ? 'Dosen' : 'Dose';
+    return unit;
   };
 
   const handleImageUploadClick = () => {
@@ -519,6 +530,25 @@ export default function NachrichtenPage() {
     return (
       <div className="w-full h-[calc(100vh-5rem)] flex justify-center items-center">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (user && !user.emailVerified) {
+    return (
+      <div className="w-full flex-1 flex flex-col items-center justify-center p-8 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mb-6">
+          <Info className="w-8 h-8" />
+        </div>
+        <h1 className="text-2xl font-extrabold mb-2">E-Mail-Verifizierung erforderlich</h1>
+        <p className="text-muted-foreground text-sm leading-relaxed mb-6">
+          Du musst deine E-Mail-Adresse verifizieren, um Nachrichten lesen und schreiben zu können. Bitte klicke auf den Link in der E-Mail, die wir dir gesendet haben.
+        </p>
+        <div className="flex gap-4">
+          <Button onClick={() => router.push('/')} variant="outline" className="rounded-full">
+            Zur Startseite
+          </Button>
+        </div>
       </div>
     );
   }
@@ -763,12 +793,13 @@ export default function NachrichtenPage() {
                     <select
                       value={suggestedUnit}
                       onChange={(e: any) => setSuggestedUnit(e.target.value)}
-                      className="h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary border-amber-500/20 text-foreground dark:text-foreground"
+                      className="h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary border-amber-500/20 text-foreground dark:text-foreground capitalize"
                     >
-                      <option value="kiste">Kiste(n)</option>
-                      <option value="flasche">Flasche(n)</option>
-                      <option value="dose">Dose(n)</option>
-                      <option value="andere">Andere</option>
+                      {availableUnits.map((u) => (
+                        <option key={u} value={u}>
+                          {u === 'flasche' ? 'Flasche(n)' : u === 'kiste' ? 'Kiste(n)' : u === 'dose' ? 'Dose(n)' : u === 'andere' ? 'Andere' : u}
+                        </option>
+                      ))}
                     </select>
                     
                     <Button
