@@ -19,10 +19,11 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState('');
+  const enableRecaptcha = false; // Set to true to re-enable reCAPTCHA in the future
 
   // Dynamically load Google reCAPTCHA v2 on registration mode
   useEffect(() => {
-    if (isLogin) {
+    if (!enableRecaptcha || isLogin) {
       setRecaptchaToken('');
       return;
     }
@@ -94,7 +95,7 @@ export default function LoginPage() {
         if (password !== confirmPassword) {
           throw new Error('Die Passwörter stimmen nicht überein.');
         }
-        if (!recaptchaToken) {
+        if (enableRecaptcha && !recaptchaToken) {
           throw new Error('Bitte bestätige das Re-CAPTCHA.');
         }
         await signUpWithEmail(email, password, name);
@@ -191,7 +192,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {!isLogin && (
+          {!isLogin && enableRecaptcha && (
             <div className="flex justify-center py-2">
               <div id="recaptcha-container"></div>
             </div>
