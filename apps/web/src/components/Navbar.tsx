@@ -1,19 +1,49 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MessageSquare, User, LogIn, LogOut } from 'lucide-react';
 import { buttonVariants } from './ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Logo } from '@/components/Logo';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebaseClient';
 
 export function Navbar() {
   const { user, userProfile, logout } = useAuth();
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const isHome = pathname === '/';
   const isAngebote = pathname === '/angebote';
   const isInserieren = pathname === '/inserieren';
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'chats'),
+      where('participantIds', 'array-contains', user.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      let count = 0;
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const chatUnread = (user && data.unreadCounts?.[user.uid]) || 0;
+        count += chatUnread;
+      });
+      setUnreadCount(count);
+    }, (err) => {
+      console.error("Fehler beim Abrufen der ungeladenen Nachrichten:", err);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   return (
     <nav className="w-full h-20 px-4 md:px-8 flex items-center justify-between bg-transparent relative z-10 border-b border-border/10">
@@ -62,7 +92,14 @@ export function Navbar() {
                 pathname === '/nachrichten' ? 'text-primary' : 'text-secondary dark:text-foreground/80 hover:text-primary'
               }`}
             >
-              <MessageSquare className="w-4.5 h-4.5 mr-1.5" />
+              <div className="relative mr-1.5 flex items-center justify-center">
+                <MessageSquare className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white dark:ring-background animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
               <span className="hidden sm:inline">Nachrichten</span>
             </Link>
             <div className="flex items-center space-x-3 md:space-x-4">

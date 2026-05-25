@@ -11,9 +11,11 @@ import {
   updateDoc, 
   doc, 
   getDoc,
-  serverTimestamp 
+  serverTimestamp,
+  increment 
 } from 'firebase/firestore';
-import { db } from '@/lib/firebaseClient';
+import { db, storage } from '@/lib/firebaseClient';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { 
@@ -22,7 +24,12 @@ import {
   Send, 
   ArrowLeft, 
   ExternalLink, 
-  Loader2 
+  Loader2,
+  Image,
+  Tag,
+  Check,
+  X,
+  Paperclip
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -35,6 +42,7 @@ interface Chat {
   participantIds: string[];
   participantNames: Record<string, string>;
   lastMessage: string;
+  unreadCounts?: Record<string, number>;
   updatedAt: any;
 }
 
@@ -44,6 +52,11 @@ interface Message {
   senderId: string;
   senderName: string;
   createdAt: any;
+  imageUrl?: string;
+  type?: 'text' | 'image' | 'offer';
+  offerAmount?: number;
+  offerUnit?: string;
+  offerStatus?: 'pending' | 'accepted' | 'declined';
 }
 
 export default function NachrichtenPage() {
@@ -62,6 +75,61 @@ export default function NachrichtenPage() {
   const [newMessageText, setNewMessageText] = useState('');
   
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const [showPriceSuggestion, setShowPriceSuggestion] = useState(false);
+  const [suggestedAmount, setSuggestedAmount] = useState('');
+  const [suggestedUnit, setSuggestedUnit] = useState<'flasche' | 'kiste' | 'dose' | 'andere'>('kiste');
+
+  const formatTime = (timestamp: any) => {
+    if (!timestamp) return '';
+    try {
+      let date: Date;
+      if (typeof timestamp.toMillis === 'function') {
+        date = new Date(timestamp.toMillis());
+      } else if (typeof timestamp.seconds === 'number') {
+        date = new Date(timestamp.seconds * 1000);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else {
+        date = new Date();
+      }
+      if (isNaN(date.getTime())) {
+        return '';
+      }
+      return date.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    } catch (e) {
+      return '';
+    }
+  };
+
+  const formatDate = (timestamp: any) => {
+    if (!timestamp) return '';
+    try {
+      let date: Date;
+      if (typeof timestamp.toMillis === 'function') {
+        date = new Date(timestamp.toMillis());
+      } else if (typeof timestamp.seconds === 'number') {
+        date = new Date(timestamp.seconds * 1000);
+      } else if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else {
+        date = new Date();
+      }
+      if (isNaN(date.getTime())) {
+        return '';
+      }
+      return date.toLocaleDateString([], {day: '2-digit', month: '2-digit'});
+    } catch (e) {
+      return '';
+    }
+  };
 
   // Parse chat query param in a client-safe way
   useEffect(() => {
@@ -161,7 +229,7 @@ export default function NachrichtenPage() {
       
       // 1. Gather all participant IDs that might have missing/anonymous names
       chats.forEach(chat => {
-        chat.participantIds.forEach(pId => {
+        chat.participantIds?.forEach(pId => {
           if (pId === user.uid) return;
           
           const currentName = chat.participantNames?.[pId];
@@ -196,10 +264,18 @@ export default function NachrichtenPage() {
             if (data.displayName) {
               updatedNames[pId] = data.displayName;
               updated = true;
+            } else {
+              updatedNames[pId] = 'Unbekannt';
+              updated = true;
             }
+          } else {
+            updatedNames[pId] = 'Unbekannt';
+            updated = true;
           }
         } catch (err) {
           console.warn(`Could not resolve display name for ${pId}:`, err);
+          updatedNames[pId] = 'Unbekannt';
+          updated = true;
         }
       }
 
@@ -210,6 +286,48 @@ export default function NachrichtenPage() {
 
     resolveNames();
   }, [chats, messages, user, fetchedNames]);
+
+  // Clear unread count for the selected chat
+  useEffect(() => {
+    if (!selectedChatId || !user) return;
+    
+    const clearUnread = async () => {
+      try {
+        const chatRef = doc(db, 'chats', selectedChatId);
+        await updateDoc(chatRef, {
+          [`unreadCounts.${user.uid}`]: 0
+        });
+      } catch (err) {
+        console.error("Fehler beim Zurücksetzen der ungelesenen Nachrichten:", err);
+      }
+    };
+    
+    clearUnread();
+  }, [selectedChatId, user]);
+
+  const getRecipientId = async (chatId: string) => {
+    // 1. Try chats state
+    const currentChat = chats.find(c => c.id === chatId);
+    if (currentChat) {
+      return currentChat.participantIds?.find(pId => pId !== user?.uid) || null;
+    }
+    // 2. Try activeChat state
+    if (activeChat && activeChat.id === chatId) {
+      return activeChat.participantIds?.find(pId => pId !== user?.uid) || null;
+    }
+    // 3. Fallback: Fetch directly from firestore
+    try {
+      const chatDoc = await getDoc(doc(db, 'chats', chatId));
+      if (chatDoc.exists()) {
+        const data = chatDoc.data();
+        const participantIds = data?.participantIds as string[];
+        return participantIds?.find(pId => pId !== user?.uid) || null;
+      }
+    } catch (e) {
+      console.error("Error fetching chat for recipient ID:", e);
+    }
+    return null;
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -229,19 +347,170 @@ export default function NachrichtenPage() {
 
       // 2. Update parent chat record for lastMessage snippet & sorting
       const chatRef = doc(db, 'chats', selectedChatId);
-      await updateDoc(chatRef, {
+      const updates: any = {
         lastMessage: textToSend,
         updatedAt: serverTimestamp()
-      });
+      };
+
+      const recipientId = await getRecipientId(selectedChatId);
+      if (recipientId) {
+        updates[`unreadCounts.${recipientId}`] = increment(1);
+      }
+
+      await updateDoc(chatRef, updates);
     } catch (err) {
       console.error("Fehler beim Senden der Nachricht:", err);
       alert("Fehler beim Senden der Nachricht.");
     }
   };
 
-  const getOtherParticipantName = (chat: Chat) => {
-    if (!user) return 'Unbekannt';
-    const otherId = chat.participantIds.find(id => id !== user.uid);
+  const getOfferUnitLabel = (unit: string, amount: number) => {
+    const plural = amount > 1;
+    switch (unit) {
+      case 'flasche': return plural ? 'Flaschen' : 'Flasche';
+      case 'kiste': return plural ? 'Kisten' : 'Kiste';
+      case 'dose': return plural ? 'Dosen' : 'Dose';
+      default: return 'Einheiten';
+    }
+  };
+
+  const handleImageUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedChatId || !user) return;
+
+    setImageUploading(true);
+    try {
+      const uuid = crypto.randomUUID();
+      const storageRef = ref(storage, `chats/${selectedChatId}/${uuid}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      // Add image message
+      await addDoc(collection(db, 'chats', selectedChatId, 'messages'), {
+        text: '[Bild]',
+        imageUrl: downloadUrl,
+        type: 'image',
+        senderId: user.uid,
+        senderName: userProfile?.displayName || user.displayName || user.email?.split('@')[0] || 'Nutzer',
+        createdAt: serverTimestamp()
+      });
+
+      // Update parent chat record
+      const chatRef = doc(db, 'chats', selectedChatId);
+      const updates: any = {
+        lastMessage: '📷 Foto gesendet',
+        updatedAt: serverTimestamp()
+      };
+
+      const recipientId = await getRecipientId(selectedChatId);
+      if (recipientId) {
+        updates[`unreadCounts.${recipientId}`] = increment(1);
+      }
+
+      await updateDoc(chatRef, updates);
+    } catch (err) {
+      console.error("Fehler beim Hochladen des Bildes:", err);
+      alert("Fehler beim Hochladen des Bildes.");
+    } finally {
+      setImageUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSendPriceSuggestion = async () => {
+    if (!selectedChatId || !user || !suggestedAmount) return;
+    
+    const amount = parseInt(suggestedAmount);
+    if (isNaN(amount) || amount <= 0) return;
+
+    try {
+      const unitText = getOfferUnitLabel(suggestedUnit, amount);
+      const textMessage = `Vorgeschlagener Preis: ${amount} ${unitText}`;
+
+      // 1. Add message of type 'offer' to subcollection
+      await addDoc(collection(db, 'chats', selectedChatId, 'messages'), {
+        text: textMessage,
+        type: 'offer',
+        offerAmount: amount,
+        offerUnit: suggestedUnit,
+        offerStatus: 'pending',
+        senderId: user.uid,
+        senderName: userProfile?.displayName || user.displayName || user.email?.split('@')[0] || 'Nutzer',
+        createdAt: serverTimestamp()
+      });
+
+      // 2. Update parent chat record
+      const chatRef = doc(db, 'chats', selectedChatId);
+      const updates: any = {
+        lastMessage: `🍻 Preisvorschlag: ${amount} ${unitText}`,
+        updatedAt: serverTimestamp()
+      };
+
+      const recipientId = await getRecipientId(selectedChatId);
+      if (recipientId) {
+        updates[`unreadCounts.${recipientId}`] = increment(1);
+      }
+
+      await updateDoc(chatRef, updates);
+      
+      // Reset state
+      setSuggestedAmount('');
+      setShowPriceSuggestion(false);
+    } catch (err) {
+      console.error("Fehler beim Senden des Preisvorschlags:", err);
+      alert("Fehler beim Senden des Preisvorschlags.");
+    }
+  };
+
+  const handleUpdateOfferStatus = async (messageId: string, status: 'accepted' | 'declined', amount: number, unit: string) => {
+    if (!selectedChatId || !user) return;
+    
+    try {
+      // 1. Update the message offerStatus
+      const msgRef = doc(db, 'chats', selectedChatId, 'messages', messageId);
+      await updateDoc(msgRef, {
+        offerStatus: status
+      });
+
+      // 2. Send a system message notifying both users of the action
+      const userName = userProfile?.displayName || user.displayName || 'Nutzer';
+      const actionText = status === 'accepted' ? 'akzeptiert' : 'abgelehnt';
+      const unitText = getOfferUnitLabel(unit, amount);
+      const systemMessageText = `📢 ${userName} hat den Preisvorschlag von ${amount} ${unitText} ${actionText}!`;
+
+      await addDoc(collection(db, 'chats', selectedChatId, 'messages'), {
+        text: systemMessageText,
+        senderId: 'system',
+        senderName: 'System',
+        createdAt: serverTimestamp()
+      });
+
+      // 3. Update the parent chat lastMessage
+      const chatRef = doc(db, 'chats', selectedChatId);
+      const updates: any = {
+        lastMessage: systemMessageText,
+        updatedAt: serverTimestamp()
+      };
+
+      const recipientId = await getRecipientId(selectedChatId);
+      if (recipientId) {
+        updates[`unreadCounts.${recipientId}`] = increment(1);
+      }
+
+      await updateDoc(chatRef, updates);
+    } catch (err) {
+      console.error("Fehler beim Aktualisieren des Status:", err);
+      alert("Fehler beim Aktualisieren des Status.");
+    }
+  };
+
+  const getOtherParticipantName = (chat: Chat | null | undefined) => {
+    if (!chat || !user) return 'Unbekannt';
+    const otherId = chat.participantIds?.find(id => id !== user.uid);
     if (!otherId) return 'Unbekannt';
     return fetchedNames[otherId] || chat.participantNames?.[otherId] || 'Unbekannt';
   };
@@ -297,7 +566,7 @@ export default function NachrichtenPage() {
                         <span className="font-bold text-sm text-secondary dark:text-foreground truncate">{otherName}</span>
                         {chat.updatedAt && (
                           <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                            {new Date(chat.updatedAt?.seconds * 1000 || chat.updatedAt?.toMillis?.() || Date.now()).toLocaleDateString([], {day: '2-digit', month: '2-digit'})}
+                            {formatDate(chat.updatedAt)}
                           </span>
                         )}
                       </div>
@@ -306,9 +575,16 @@ export default function NachrichtenPage() {
                         {chat.listingTitle}
                       </div>
                       
-                      <p className="text-xs text-muted-foreground truncate leading-relaxed">
-                        {chat.lastMessage}
-                      </p>
+                      <div className="flex justify-between items-center gap-2">
+                        <p className={`text-xs truncate leading-relaxed flex-1 ${chat.unreadCounts?.[user?.uid || ''] ? 'font-semibold text-secondary dark:text-foreground' : 'text-muted-foreground'}`}>
+                          {chat.lastMessage}
+                        </p>
+                        {chat.unreadCounts?.[user?.uid || ''] ? (
+                          <span className="flex h-4.5 min-w-[18px] px-1 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shrink-0">
+                            {chat.unreadCounts[user?.uid || '']}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </button>
                 );
@@ -371,6 +647,19 @@ export default function NachrichtenPage() {
                 ) : (
                   messages.map((msg) => {
                     const isOwn = msg.senderId === user?.uid;
+                    const isSystem = msg.senderId === 'system';
+                    const isOffer = msg.type === 'offer';
+
+                    if (isSystem) {
+                      return (
+                        <div key={msg.id} className="flex justify-center my-2.5">
+                          <div className="bg-slate-100 dark:bg-slate-800 text-muted-foreground text-xs font-bold px-4 py-1.5 rounded-full border border-border/30 shadow-sm">
+                            {msg.text}
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return (
                       <div 
                         key={msg.id}
@@ -382,9 +671,66 @@ export default function NachrichtenPage() {
                               {fetchedNames[msg.senderId] || msg.senderName || 'Nutzer'}
                             </span>
                           )}
-                          <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+
+                          {msg.imageUrl && (
+                            <div className="mb-2 overflow-hidden rounded-lg max-w-full">
+                              <img src={msg.imageUrl} alt="Bild" className="w-full max-h-60 object-cover rounded-lg border border-border/10" />
+                            </div>
+                          )}
+
+                          {isOffer ? (
+                            <div className="my-1.5 p-3 rounded-xl border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/20 text-foreground dark:text-foreground">
+                              <div className="flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400 mb-1.5 text-xs">
+                                <span>🍻 Preisvorschlag</span>
+                              </div>
+                              <div className="font-extrabold text-base md:text-lg mb-2 text-secondary dark:text-foreground">
+                                {msg.offerAmount} {getOfferUnitLabel(msg.offerUnit || '', msg.offerAmount || 0)}
+                              </div>
+                              
+                              {msg.offerStatus === 'pending' ? (
+                                !isOwn ? (
+                                  <div className="flex gap-2 mt-2">
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => handleUpdateOfferStatus(msg.id, 'accepted', msg.offerAmount || 0, msg.offerUnit || '')}
+                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-1 h-8 rounded-lg flex items-center gap-1 flex-1 shadow-sm"
+                                    >
+                                      <Check className="w-3.5 h-3.5" /> Akzeptieren
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleUpdateOfferStatus(msg.id, 'declined', msg.offerAmount || 0, msg.offerUnit || '')}
+                                      className="font-semibold text-xs py-1 h-8 rounded-lg flex items-center gap-1 flex-1 shadow-sm"
+                                    >
+                                      <X className="w-3.5 h-3.5" /> Ablehnen
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-100/50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                    Ausstehend
+                                  </div>
+                                )
+                              ) : msg.offerStatus === 'accepted' ? (
+                                <div className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-100/50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">
+                                  <Check className="w-3.5 h-3.5" /> Akzeptiert
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold bg-rose-100/50 dark:bg-rose-900/30 px-2.5 py-1 rounded-full">
+                                  <X className="w-3.5 h-3.5" /> Abgelehnt
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+
+                          {(!isOffer && msg.text && msg.text !== '[Bild]') && (
+                            <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                          )}
+
                           <span className={`block text-[9px] text-right mt-1 ${isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>
-                            {msg.createdAt ? new Date(msg.createdAt?.seconds * 1000 || msg.createdAt?.toMillis?.() || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                            {formatTime(msg.createdAt)}
                           </span>
                         </div>
                       </div>
@@ -394,11 +740,99 @@ export default function NachrichtenPage() {
                 <div ref={messagesEndRef} />
               </div>
 
+              {/* Price Suggestion Panel */}
+              {showPriceSuggestion && (
+                <div className="p-4 bg-amber-50/75 dark:bg-amber-950/10 border-t border-amber-500/10 flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between shrink-0 animate-in slide-in-from-bottom duration-200">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                      <span>🍻 Preisvorschlag in Trinken machen</span>
+                    </span>
+                    <span className="text-[11px] text-muted-foreground mt-0.5">Gib an, wie viel und welches Getränk du vorschlägst.</span>
+                  </div>
+                  
+                  <div className="flex gap-2 items-center">
+                    <Input
+                      type="number"
+                      min="1"
+                      placeholder="Menge"
+                      value={suggestedAmount}
+                      onChange={(e) => setSuggestedAmount(e.target.value)}
+                      className="w-20 h-10 rounded-lg text-sm bg-white dark:bg-card border-amber-500/20"
+                    />
+                    
+                    <select
+                      value={suggestedUnit}
+                      onChange={(e: any) => setSuggestedUnit(e.target.value)}
+                      className="h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary border-amber-500/20 text-foreground dark:text-foreground"
+                    >
+                      <option value="kiste">Kiste(n)</option>
+                      <option value="flasche">Flasche(n)</option>
+                      <option value="dose">Dose(n)</option>
+                      <option value="andere">Andere</option>
+                    </select>
+                    
+                    <Button
+                      type="button"
+                      onClick={handleSendPriceSuggestion}
+                      disabled={!suggestedAmount || parseInt(suggestedAmount) <= 0}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-bold h-10 px-4 rounded-lg flex items-center gap-1.5 shadow-sm text-xs"
+                    >
+                      Senden
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setShowPriceSuggestion(false)}
+                      className="h-10 w-10 text-muted-foreground hover:bg-slate-200/50"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Chat Input */}
               <form 
                 onSubmit={handleSendMessage}
                 className="p-4 bg-white dark:bg-card border-t border-border/60 flex gap-2.5 items-center shrink-0 shadow-inner"
               >
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  disabled={imageUploading}
+                  onClick={handleImageUploadClick}
+                  className="h-12 w-12 rounded-xl border-border/60 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary transition-colors text-muted-foreground shrink-0"
+                  title="Bild senden"
+                >
+                  {imageUploading ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  ) : (
+                    <Image className="w-5 h-5" />
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowPriceSuggestion(!showPriceSuggestion)}
+                  className={`h-12 w-12 rounded-xl border-border/60 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-primary transition-colors shrink-0 ${showPriceSuggestion ? 'bg-primary/10 text-primary border-primary/30' : 'text-muted-foreground'}`}
+                  title="Preisvorschlag senden"
+                >
+                  <Tag className="w-5 h-5" />
+                </Button>
+
                 <Input
                   value={newMessageText}
                   onChange={(e) => setNewMessageText(e.target.value)}

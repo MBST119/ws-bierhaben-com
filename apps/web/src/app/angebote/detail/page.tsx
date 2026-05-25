@@ -134,6 +134,10 @@ export default function InseratDetailPage() {
           [user.uid]: userProfile?.displayName || user.displayName || user.email || "Anonymer User",
           [listing.sellerId]: sellerProfile?.displayName || listing.sellerName || "Anonymer User"
         },
+        unreadCounts: {
+          [user.uid]: 0,
+          [listing.sellerId]: 1
+        },
         lastMessage: "Tausch-Chat gestartet",
         updatedAt: serverTimestamp(),
         createdAt: serverTimestamp(),
