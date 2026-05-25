@@ -1,0 +1,151 @@
+{
+  "collections": {
+    "users": {
+      "description": "User profiles synced from Firebase Authentication upon registration/login.",
+      "schema": {
+        "uid": {
+          "type": "string",
+          "description": "Unique identifier matching the Firebase Auth UID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the user"
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address"
+        },
+        "photoURL": {
+          "type": "string | null",
+          "description": "URL to the user's profile picture"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "Timestamp when the user account was created in Firestore"
+        },
+        "listingsCount": {
+          "type": "number",
+          "description": "Denormalized counter of active listings created by the user"
+        },
+        "exchangesCount": {
+          "type": "number",
+          "description": "Denormalized counter of successful exchanges completed by the user"
+        }
+      }
+    },
+    "listings": {
+      "description": "Items posted by users to trade for beer or beverages.",
+      "schema": {
+        "id": {
+          "type": "string",
+          "description": "Unique listing identifier"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the listing"
+        },
+        "description": {
+          "type": "string",
+          "description": "Detailed description of the item being offered"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category key (e.g. 'moebel', 'elektronik', 'kleidung', 'sonstiges')"
+        },
+        "beerPrice": {
+          "type": "number",
+          "description": "Price in terms of beer units (integer or decimal)"
+        },
+        "beerUnit": {
+          "type": "string",
+          "enum": ["flasche", "kiste", "dose", "andere"],
+          "description": "Unit of beverage used as currency"
+        },
+        "condition": {
+          "type": "string",
+          "enum": ["neu", "neuwertig", "gut", "gebraucht"],
+          "description": "Physical state of the item"
+        },
+        "images": {
+          "type": "array of strings",
+          "description": "URLs of uploaded images in Firebase Storage (max 10)"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "exchanged"],
+          "description": "Status of the trade"
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "Reference UID to the seller in the 'users' collection"
+        },
+        "sellerName": {
+          "type": "string",
+          "description": "Denormalized display name of the seller to avoid extra reads"
+        },
+        "sellerPhotoURL": {
+          "type": "string | null",
+          "description": "Denormalized profile photo URL of the seller to avoid extra reads"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "Timestamp when the listing was published"
+        },
+        "updatedAt": {
+          "type": "timestamp",
+          "description": "Timestamp when the listing was last updated"
+        }
+      }
+    },
+    "exchanges": {
+      "description": "Historical log of swap transactions when an item status transitions to 'exchanged'.",
+      "schema": {
+        "id": {
+          "type": "string",
+          "description": "Unique transaction identifier"
+        },
+        "listingId": {
+          "type": "string",
+          "description": "Reference ID to the listing traded"
+        },
+        "listingTitle": {
+          "type": "string",
+          "description": "Denormalized title of the traded item for reporting"
+        },
+        "sellerId": {
+          "type": "string",
+          "description": "UID of the seller"
+        },
+        "sellerName": {
+          "type": "string",
+          "description": "Denormalized name of the seller"
+        },
+        "buyerId": {
+          "type": "string",
+          "description": "UID of the buyer (initiating the swap)"
+        },
+        "buyerName": {
+          "type": "string",
+          "description": "Denormalized name of the buyer"
+        },
+        "beerPrice": {
+          "type": "number",
+          "description": "Swapped price value"
+        },
+        "beerUnit": {
+          "type": "string",
+          "description": "Swapped beverage unit"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "cancelled"],
+          "description": "Status of the trade history record"
+        },
+        "createdAt": {
+          "type": "timestamp",
+          "description": "Timestamp when the transaction was completed"
+        }
+      }
+    }
+  }
+}

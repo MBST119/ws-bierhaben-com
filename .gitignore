@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.firebase/
+.DS_Store
+*.local
+.next/
+out/
+.env*.local
+app.tar.gz

@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "bierhaben-com-dev",
+    "development": "bierhaben-com-dev",
+    "production": "bierhaben-com-prod"
+  }
+}

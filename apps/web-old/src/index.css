@@ -1,0 +1,149 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "DM Sans", sans-serif;
+  overflow-x: clip;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@layer base {
+  :root {
+    /* Light blue background matching the logo */
+    --background: 210 70% 92%;
+    /* Dark blue text for readability */
+    --foreground: 210 50% 20%;
+    
+    /* Slightly lighter blue for cards to stand out subtly */
+    --card: 210 70% 96%;
+    --card-foreground: 210 50% 20%;
+    
+    --popover: 210 70% 96%;
+    --popover-foreground: 210 50% 20%;
+    
+    /* Orange primary */
+    --primary: 36 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Dark blue secondary */
+    --secondary: 210 50% 20%;
+    --secondary-foreground: 0 0% 100%;
+    
+    /* Muted blue tones */
+    --muted: 210 40% 85%;
+    --muted-foreground: 210 30% 40%;
+    
+    /* Accent blue tones */
+    --accent: 210 50% 85%;
+    --accent-foreground: 210 50% 20%;
+    
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Subtle blue borders */
+    --border: 210 40% 82%;
+    --input: 210 40% 82%;
+    --ring: 36 100% 50%;
+    
+    --radius: 0.75rem;
+
+    /* Chat specifics */
+    --chat-own: 36 100% 50%;
+    --chat-own-fg: 0 0% 100%;
+    --chat-other: 210 50% 20%;
+    --chat-other-fg: 0 0% 100%;
+
+    /* Seller and Chat Button Specifics */
+    --seller-bg: 210 70% 96%;
+    --seller-text: 210 50% 20%;
+    --chat-button-bg: 36 100% 50%; /* #FF9500 */
+    --chat-button-text: 0 0% 100%; /* white */
+  }
+
+  .dark {
+    /* Deep blue background for dark mode */
+    --background: 210 50% 10%;
+    --foreground: 210 70% 92%;
+    
+    --card: 210 50% 14%;
+    --card-foreground: 210 70% 92%;
+    
+    --popover: 210 50% 14%;
+    --popover-foreground: 210 70% 92%;
+    
+    --primary: 36 100% 50%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 210 50% 20%;
+    --secondary-foreground: 0 0% 100%;
+    
+    --muted: 210 40% 20%;
+    --muted-foreground: 210 30% 70%;
+    
+    --accent: 210 40% 20%;
+    --accent-foreground: 210 70% 92%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    --border: 210 40% 20%;
+    --input: 210 40% 20%;
+    --ring: 36 100% 50%;
+
+    /* Chat specifics - keeping high contrast */
+    --chat-own: 36 100% 50%;
+    --chat-own-fg: 0 0% 100%;
+    --chat-other: 210 50% 25%;
+    --chat-other-fg: 210 70% 92%;
+
+    /* Seller and Chat Button Specifics - Dark Mode */
+    --seller-bg: 210 50% 14%;
+    --seller-text: 210 70% 92%;
+    --chat-button-bg: 36 100% 50%;
+    --chat-button-text: 0 0% 100%;
+  }
+}
+
+@layer components {
+  .chat-bubble-own {
+    background-color: hsl(var(--chat-own));
+    color: hsl(var(--chat-own-fg));
+    border-radius: 1rem 1rem 0 1rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  .chat-bubble-other {
+    background-color: hsl(var(--chat-other));
+    color: hsl(var(--chat-other-fg));
+    border-radius: 1rem 1rem 1rem 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .animate-message-enter {
+    animation: message-slide-in 0.25s ease-out forwards;
+  }
+}
+
+@keyframes message-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

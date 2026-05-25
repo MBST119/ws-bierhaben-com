@@ -1,0 +1,10 @@
+## Pages
+- [Angebote durchsuchen - bierhaben.com](/listings): Durchsuche alle Angebote auf bierhaben.com und finde Gegenstände, die du gegen Bier tauschen kannst.
+- [Anmelden - bierhaben.com](/login): Melde dich bei bierhaben.com an und tausche Gegenstände gegen Bier.
+- [bierhaben.com - Der Biermarkt für die DACH-Region](/home): Die Tauschbörse mit Bier-Währung für die DACH-Region. Tausche Gegenstände gegen Bier statt Geld.
+- [Inserat erstellen - bierhaben.com](/createlisting): Erstelle ein neues Inserat auf bierhaben.com und tausche deine Gegenstände gegen Bier.
+- [Lädt... - bierhaben.com](/listingdetail): No description available
+- [Mein Profil - bierhaben.com](/profile): Verwalte dein Profil auf bierhaben.com
+- [Meine Inserate - bierhaben.com](/mylistings): Verwalte deine Inserate auf bierhaben.com
+- [Nachrichten - bierhaben.com](/messages): Verwalte deine Nachrichten auf bierhaben.com
+- [Registrieren - bierhaben.com](/signup): Erstelle ein kostenloses Konto bei bierhaben.com und beginne zu tauschen.
