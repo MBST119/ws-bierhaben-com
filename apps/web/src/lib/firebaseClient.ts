@@ -23,7 +23,12 @@ const prodConfig = {
 
 // Use environment variables if set, otherwise fallback to window checks for client
 const isProd = process.env.NEXT_PUBLIC_ENV === 'production' || 
-  (typeof window !== 'undefined' && (window.location.hostname.includes('bierhaben-com-prod') || window.location.hostname.includes('bierhaben-prod')));
+  (typeof window !== 'undefined' && (
+    window.location.hostname === 'bierhaben.com' ||
+    window.location.hostname === 'www.bierhaben.com' ||
+    window.location.hostname.includes('bierhaben-com-prod') || 
+    window.location.hostname.includes('bierhaben-prod')
+  ));
 
 const firebaseConfig = isProd ? prodConfig : devConfig;
 
