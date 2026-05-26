@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Listing } from '@/types';
+import { fetchPaymentUnits, PaymentUnit } from '@/lib/paymentSettings';
 
 
 function AngeboteContent() {
@@ -20,6 +21,11 @@ function AngeboteContent() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [selectedCategory, setSelectedCategory] = useState(initialCat);
+  const [availableUnits, setAvailableUnits] = useState<PaymentUnit[]>([]);
+
+  useEffect(() => {
+    fetchPaymentUnits().then(setAvailableUnits);
+  }, []);
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -74,12 +80,28 @@ function AngeboteContent() {
     return matchesSearch && matchesCategory;
   });
 
-  const getUnitEmoji = (unit: string) => {
-    switch (unit) {
+  const getUnitEmoji = (unitId: string) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) return found.emoji;
+    switch (unitId) {
       case 'flasche': return '🍺';
       case 'kiste': return '🍻';
       case 'dose': return '🥫';
       default: return '🥤';
+    }
+  };
+
+  const getUnitName = (unitId: string, price: number) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) {
+      return price > 1 ? (found.labelPlural || found.label) : found.label;
+    }
+    const plural = price > 1;
+    switch (unitId) {
+      case 'flasche': return plural ? 'Flaschen' : 'Flasche';
+      case 'kiste': return plural ? 'Kisten' : 'Kiste';
+      case 'dose': return plural ? 'Dosen' : 'Dose';
+      default: return unitId;
     }
   };
 
@@ -160,7 +182,7 @@ function AngeboteContent() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredListings.map((listing) => (
-              <Link href={`/angebote/detail?id=${listing.id}`} key={listing.id} className="group">
+              <Link href={`/angebote/detail?id=${listing.id}`} key={listing.id} className="group block">
                 <div className="bg-white dark:bg-card border border-border/60 rounded-2xl overflow-hidden hover:shadow-md transition-all duration-300 flex flex-col h-full hover:-translate-y-1">
                   
                   {/* Image Container with Badge */}
@@ -187,7 +209,7 @@ function AngeboteContent() {
                     <div className="absolute bottom-3 left-3 bg-primary text-white px-3 py-1 rounded-xl shadow-md border border-white/10 flex items-center gap-1.5 font-bold transition-all transform group-hover:scale-105">
                       <span>{listing.beerPrice}x</span>
                       <span className="text-lg">{getUnitEmoji(listing.beerUnit)}</span>
-                      <span className="text-xs uppercase tracking-wide font-extrabold">{listing.beerUnit}</span>
+                      <span className="text-xs uppercase tracking-wide font-extrabold">{getUnitName(listing.beerUnit, listing.beerPrice)}</span>
                     </div>
                   </div>
 
@@ -214,8 +236,12 @@ function AngeboteContent() {
                         <span className="truncate max-w-[90px]">{listing.sellerName}</span>
                       </div>
                       <div className="flex items-center gap-1 font-semibold text-primary/80">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>AT/DE</span>
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate max-w-[90px]">
+                          {listing.sellerZipCode && listing.sellerCity 
+                            ? `${listing.sellerZipCode} ${listing.sellerCity}` 
+                            : 'AT/DE'}
+                        </span>
                       </div>
                     </div>
 

@@ -6,18 +6,73 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run build",
+        "cp dist/apps/web/angebote/detail.html functions/detail-template.html || true"
+      ]
+    }
+  ],
   "hosting": {
     "public": "dist/apps/web",
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "dist/apps/web/angebote/detail.html",
+      "dist/apps/web/angebote/detail.txt",
+      "dist/apps/web/angebote/detail/**",
+      "angebote/detail.html",
+      "angebote/detail.txt",
+      "angebote/detail/**"
+    ],
+    "cleanUrls": true,
+    "trailingSlash": false,
+    "headers": [
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/_next/static/**/*",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      }
     ],
     "rewrites": [
+      { "source": "/angebote", "destination": "/angebote/index.html" },
       {
-        "source": "**",
-        "destination": "/index.html"
-      }
+        "source": "/angebote/detail",
+        "function": {
+          "functionId": "serveListingDetail",
+          "region": "europe-west1"
+        }
+      },
+      { "source": "/login", "destination": "/login/index.html" },
+      { "source": "/inserieren", "destination": "/inserieren/index.html" },
+      { "source": "/nachrichten", "destination": "/nachrichten/index.html" },
+      { "source": "/profil", "destination": "/profil/index.html" },
+      { "source": "/admin", "destination": "/admin/index.html" },
+      { "source": "**", "destination": "/index.html" }
     ]
   }
 }

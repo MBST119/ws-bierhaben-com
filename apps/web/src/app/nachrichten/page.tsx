@@ -18,7 +18,7 @@ import { db, storage } from '@/lib/firebaseClient';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { fetchPaymentUnits } from '@/lib/paymentSettings';
+import { fetchPaymentUnits, PaymentUnit } from '@/lib/paymentSettings';
 import { 
   MessageSquare, 
   Clock, 
@@ -84,13 +84,13 @@ export default function NachrichtenPage() {
   const [showPriceSuggestion, setShowPriceSuggestion] = useState(false);
   const [suggestedAmount, setSuggestedAmount] = useState('');
   const [suggestedUnit, setSuggestedUnit] = useState<string>('kiste');
-  const [availableUnits, setAvailableUnits] = useState<string[]>(['flasche', 'kiste', 'dose', 'andere']);
+  const [availableUnits, setAvailableUnits] = useState<PaymentUnit[]>([]);
 
   useEffect(() => {
     fetchPaymentUnits().then((fetched) => {
       setAvailableUnits(fetched);
       if (fetched.length > 0) {
-        setSuggestedUnit(fetched[0]);
+        setSuggestedUnit(fetched[0].id);
       }
     });
   }, []);
@@ -376,13 +376,17 @@ export default function NachrichtenPage() {
     }
   };
 
-  const getOfferUnitLabel = (unit: string, amount: number) => {
+  const getOfferUnitLabel = (unitId: string, amount: number) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) {
+      return amount > 1 ? (found.labelPlural || found.label) : found.label;
+    }
     const plural = amount > 1;
-    const lowerUnit = unit.toLowerCase();
+    const lowerUnit = unitId.toLowerCase();
     if (lowerUnit === 'flasche') return plural ? 'Flaschen' : 'Flasche';
     if (lowerUnit === 'kiste') return plural ? 'Kisten' : 'Kiste';
     if (lowerUnit === 'dose') return plural ? 'Dosen' : 'Dose';
-    return unit;
+    return unitId;
   };
 
   const handleImageUploadClick = () => {
@@ -554,8 +558,8 @@ export default function NachrichtenPage() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto pt-6 px-4 pb-12 h-[calc(100vh-6rem)] min-h-[500px] flex flex-col">
-      <div className="flex-1 bg-white dark:bg-card border border-border/80 rounded-2xl shadow-sm overflow-hidden flex">
+    <div className="w-full max-w-6xl mx-auto pt-0 md:pt-6 px-0 md:px-4 pb-0 md:pb-12 h-[calc(100dvh-4rem)] md:h-[calc(100vh-5rem)] md:min-h-[500px] flex flex-col">
+      <div className="flex-1 bg-white dark:bg-card border-0 md:border border-border/80 rounded-none md:rounded-2xl shadow-none md:shadow-sm overflow-hidden flex">
         
         {/* LEFT COLUMN: CHATS SIDEBAR (Hidden on mobile if chat is active) */}
         <div className={`w-full md:w-80 lg:w-96 border-r border-border/60 flex flex-col shrink-0 ${selectedChatId ? 'hidden md:flex' : 'flex'}`}>
@@ -624,7 +628,7 @@ export default function NachrichtenPage() {
         </div>
 
         {/* RIGHT COLUMN: ACTIVE CHAT CONVERSATION */}
-        <div className={`flex-1 flex flex-col bg-slate-50/50 dark:bg-slate-900/10 ${!selectedChatId ? 'hidden md:flex justify-center items-center text-muted-foreground' : 'flex'}`}>
+        <div className={`flex-1 w-full min-w-0 flex flex-col bg-slate-50/50 dark:bg-slate-900/10 ${!selectedChatId ? 'hidden md:flex justify-center items-center text-muted-foreground' : 'flex'}`}>
           {activeChat ? (
             <>
               {/* Chat Header */}
@@ -796,8 +800,8 @@ export default function NachrichtenPage() {
                       className="h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary border-amber-500/20 text-foreground dark:text-foreground capitalize"
                     >
                       {availableUnits.map((u) => (
-                        <option key={u} value={u}>
-                          {u === 'flasche' ? 'Flasche(n)' : u === 'kiste' ? 'Kiste(n)' : u === 'dose' ? 'Dose(n)' : u === 'andere' ? 'Andere' : u}
+                        <option key={u.id} value={u.id}>
+                          {u.emoji} {u.label}
                         </option>
                       ))}
                     </select>

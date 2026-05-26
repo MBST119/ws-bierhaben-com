@@ -6,7 +6,7 @@ import { db } from '@/lib/firebaseClient';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { MessageSquare, ArrowLeft, ShieldCheck, Heart } from 'lucide-react';
+import { MessageSquare, ArrowLeft, ShieldCheck, Heart, Share2, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { Listing, UserProfile } from '@/types';
 
@@ -137,6 +137,35 @@ export default function InseratDetailPage() {
     router.push(`/nachrichten?chat=${chatId}`);
   };
 
+  const handleShareListing = async () => {
+    if (!listing) return;
+    const shareUrl = window.location.href;
+    const shareTitle = `${listing.title} | bierhaben.com`;
+    const unitLabel = getUnitName(listing.beerUnit, listing.beerPrice);
+    const emoji = getUnitEmoji(listing.beerUnit);
+    const shareText = `Schau mal, was ich auf bierhaben.com gefunden habe: "${listing.title}" für ${listing.beerPrice}x ${unitLabel} ${emoji}!`;
+
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: `${shareText}\n\n${shareUrl}`,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.log('Error sharing:', err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        alert('Link wurde in die Zwischenablage kopiert!');
+      } catch (err) {
+        console.error('Failed to copy text: ', err);
+      }
+    }
+  };
+
   const getUnitName = (unit: string, price: number) => {
     const plural = price > 1;
     switch (unit) {
@@ -186,10 +215,31 @@ export default function InseratDetailPage() {
         Zurück zur Suche
       </Link>
 
-      {/* Listing Title */}
-      <h1 className="text-3xl md:text-4xl font-extrabold text-secondary dark:text-foreground mb-6 tracking-tight">
-        {listing.title}
-      </h1>
+      {/* Listing Title & Share */}
+      <div className="flex justify-between items-start gap-4 mb-6">
+        <div className="flex-1">
+          <h1 className="text-3xl md:text-4xl font-extrabold text-secondary dark:text-foreground tracking-tight leading-tight mb-2">
+            {listing.title}
+          </h1>
+          <div className="flex items-center gap-1.5 text-sm font-semibold text-primary/80">
+            <MapPin className="w-4 h-4 shrink-0" />
+            <span>
+              {listing.sellerZipCode && listing.sellerCity 
+                ? `${listing.sellerZipCode} ${listing.sellerCity}` 
+                : 'AT/DE'}
+            </span>
+          </div>
+        </div>
+        <Button
+          onClick={handleShareListing}
+          variant="outline"
+          size="icon"
+          className="h-12 w-12 rounded-xl border-border/60 hover:bg-slate-100 hover:text-primary transition-colors text-muted-foreground shrink-0 shadow-sm mt-1"
+          title="Inserat teilen"
+        >
+          <Share2 className="w-5 h-5" />
+        </Button>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         
@@ -252,6 +302,15 @@ export default function InseratDetailPage() {
                 <MessageSquare className="w-5 h-5 mr-2" />
                 Anfragen / Chat starten
               </Button>
+              <Button 
+                onClick={handleShareListing}
+                variant="outline"
+                size="lg" 
+                className="w-full border-border/60 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl py-6 text-base font-bold transition-all text-secondary dark:text-foreground"
+              >
+                <Share2 className="w-5 h-5 mr-2 text-primary" />
+                Inserat teilen
+              </Button>
             </div>
           </div>
 
@@ -276,12 +335,14 @@ export default function InseratDetailPage() {
             </div>
             
             <div className="border-t border-border/40 pt-4 space-y-2 text-xs text-muted-foreground">
-              {sellerProfile?.email && (
-                <div className="flex justify-between">
-                  <span>E-Mail:</span>
-                  <span className="font-semibold text-secondary dark:text-foreground truncate max-w-[180px]">{sellerProfile.email}</span>
-                </div>
-              )}
+              <div className="flex justify-between">
+                <span>Standort:</span>
+                <span className="font-semibold text-secondary dark:text-foreground">
+                  {listing.sellerZipCode && listing.sellerCity 
+                    ? `${listing.sellerZipCode} ${listing.sellerCity}` 
+                    : 'AT/DE'}
+                </span>
+              </div>
               {sellerProfile?.createdAt && (
                 <div className="flex justify-between">
                   <span>Mitglied seit:</span>
@@ -313,6 +374,14 @@ export default function InseratDetailPage() {
               <div className="flex justify-between">
                 <dt className="text-muted-foreground font-medium">Zustand</dt>
                 <dd className="font-bold text-secondary dark:text-foreground capitalize">{listing.condition.replace('_', ' ')}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted-foreground font-medium">Standort</dt>
+                <dd className="font-bold text-secondary dark:text-foreground">
+                  {listing.sellerZipCode && listing.sellerCity 
+                    ? `${listing.sellerZipCode} ${listing.sellerCity}` 
+                    : 'AT/DE'}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground font-medium">Eingestellt am</dt>

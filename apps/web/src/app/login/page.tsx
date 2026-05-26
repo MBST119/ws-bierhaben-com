@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getFunctions, httpsCallable } from 'firebase/functions';
+import { app } from '@/lib/firebaseClient';
 
 export default function LoginPage() {
   const { signInWithGoogle, signInWithEmail, signUpWithEmail } = useAuth();
@@ -19,7 +21,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState('');
-  const enableRecaptcha = false; // Set to true to re-enable reCAPTCHA in the future
+  const enableRecaptcha = true;
 
   // Dynamically load Google reCAPTCHA v2 on registration mode
   useEffect(() => {
@@ -53,7 +55,7 @@ export default function LoginPage() {
       if (container && (window as any).grecaptcha) {
         try {
           container.innerHTML = '';
-          const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+          const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY || '6LcNUf0sAAAAAORSPXOF0FuZh-iH9aOaEDprsejj';
           (window as any).grecaptcha.render('recaptcha-container', {
             sitekey: siteKey,
             callback: (token: string) => {
@@ -98,6 +100,19 @@ export default function LoginPage() {
         if (enableRecaptcha && !recaptchaToken) {
           throw new Error('Bitte bestätige das Re-CAPTCHA.');
         }
+
+        // Server-side reCAPTCHA verification
+        if (enableRecaptcha && recaptchaToken) {
+          const functions = getFunctions(app, 'europe-west1');
+          const verifyRecaptcha = httpsCallable(functions, 'verifyRecaptcha');
+          try {
+            await verifyRecaptcha({ token: recaptchaToken });
+          } catch (verifyErr: any) {
+            const message = verifyErr?.message || 'reCAPTCHA-Verifizierung fehlgeschlagen.';
+            throw new Error(message);
+          }
+        }
+
         await signUpWithEmail(email, password, name);
       }
       router.push('/');

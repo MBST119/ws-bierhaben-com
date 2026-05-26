@@ -35,17 +35,21 @@ import {
 } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { Listing, BeerUnit, ItemCondition } from '@/types';
-import { fetchPaymentUnits } from '@/lib/paymentSettings';
+import { fetchPaymentUnits, PaymentUnit } from '@/lib/paymentSettings';
 
 export default function ProfilPage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, userProfile, loading, refreshUser } = useAuth();
   
   // Tabs
   const [activeTab, setActiveTab] = useState<'listings' | 'settings'>('listings');
   
   // Profile settings state
   const [displayName, setDisplayName] = useState('');
+  const [street, setStreet] = useState('');
+  const [houseNumber, setHouseNumber] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [city, setCity] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
   const [profileErrorMsg, setProfileErrorMsg] = useState('');
@@ -62,7 +66,7 @@ export default function ProfilPage() {
   const [editUnit, setEditUnit] = useState<BeerUnit>('flasche');
   const [editCondition, setEditCondition] = useState<ItemCondition>('gut');
   const [isSavingListing, setIsSavingListing] = useState(false);
-  const [availableUnits, setAvailableUnits] = useState<string[]>(['flasche', 'kiste', 'dose', 'andere']);
+  const [availableUnits, setAvailableUnits] = useState<PaymentUnit[]>([]);
 
   useEffect(() => {
     fetchPaymentUnits().then(setAvailableUnits);
@@ -72,10 +76,14 @@ export default function ProfilPage() {
     if (!loading && !user) {
       router.push('/login');
     } else if (user) {
-      setDisplayName(user.displayName || '');
+      setDisplayName(userProfile?.displayName || user.displayName || '');
+      setStreet(userProfile?.street || '');
+      setHouseNumber(userProfile?.houseNumber || '');
+      setZipCode(userProfile?.zipCode || '');
+      setCity(userProfile?.city || '');
       fetchUserListings();
     }
-  }, [user, loading, router]);
+  }, [user, userProfile, loading, router]);
 
   const fetchUserListings = async () => {
     if (!user) return;
@@ -122,11 +130,34 @@ export default function ProfilPage() {
       // 1. Update Firebase Auth Profile
       await updateProfile(user, { displayName });
 
+      const cleanedStreet = street.trim();
+      const cleanedHouseNumber = houseNumber.trim();
+      const cleanedZipCode = zipCode.trim();
+      const cleanedCity = city.trim();
+
       // 2. Update Users collection in Firestore
       await setDoc(doc(db, 'users', user.uid), {
         displayName,
+        street: cleanedStreet,
+        houseNumber: cleanedHouseNumber,
+        zipCode: cleanedZipCode,
+        city: cleanedCity,
         updatedAt: new Date()
       }, { merge: true });
+
+      // 3. Update all existing listings with new ZIP & City
+      const listingsQuery = query(collection(db, 'listings'), where('sellerId', '==', user.uid));
+      const listingsSnap = await getDocs(listingsQuery);
+      const updatePromises = listingsSnap.docs.map((docSnap) => 
+        updateDoc(docSnap.ref, {
+          sellerZipCode: cleanedZipCode || null,
+          sellerCity: cleanedCity || null
+        })
+      );
+      await Promise.all(updatePromises);
+
+      // 4. Refresh auth state
+      await refreshUser();
 
       setProfileSuccessMsg('Profil erfolgreich aktualisiert.');
     } catch (err: any) {
@@ -229,6 +260,31 @@ export default function ProfilPage() {
     }
   };
 
+  const getUnitEmoji = (unitId: string) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) return found.emoji;
+    switch (unitId) {
+      case 'flasche': return '🍺';
+      case 'kiste': return '🍻';
+      case 'dose': return '🥫';
+      default: return '🥤';
+    }
+  };
+
+  const getUnitName = (unitId: string, price: number) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) {
+      return price > 1 ? (found.labelPlural || found.label) : found.label;
+    }
+    const plural = price > 1;
+    switch (unitId) {
+      case 'flasche': return plural ? 'Flaschen' : 'Flasche';
+      case 'kiste': return plural ? 'Kisten' : 'Kiste';
+      case 'dose': return plural ? 'Dosen' : 'Dose';
+      default: return unitId;
+    }
+  };
+
   if (loading) {
     return (
       <div className="w-full h-[calc(100vh-5rem)] flex justify-center items-center">
@@ -301,9 +357,15 @@ export default function ProfilPage() {
                       {listing.status === 'open' ? 'Aktiv / Online' : 'Offline'}
                     </div>
 
+                    {/* Views Count Badge */}
+                    <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded-full text-xs font-bold text-white shadow-sm border border-white/10 flex items-center gap-1 select-none">
+                      <span>👁️</span>
+                      <span>{listing.viewsCount || 0}</span>
+                    </div>
+
                     {/* Price Badge */}
-                    <div className="absolute bottom-3 right-3 bg-primary text-white px-2.5 py-1 rounded-xl shadow-md border border-white/10 text-sm font-bold">
-                      {listing.beerPrice}x {listing.beerUnit === 'flasche' ? '🍺' : listing.beerUnit === 'kiste' ? '🍻' : listing.beerUnit === 'dose' ? '🥫' : '🥤'}
+                    <div className="absolute bottom-3 right-3 bg-primary text-white px-2.5 py-1 rounded-xl shadow-md border border-white/10 text-sm font-bold flex items-center gap-1">
+                      {listing.beerPrice}x {getUnitEmoji(listing.beerUnit)} {getUnitName(listing.beerUnit, listing.beerPrice)}
                     </div>
                   </div>
 
@@ -410,6 +472,54 @@ export default function ProfilPage() {
               />
             </div>
 
+            {/* Street + House Number (Grid) */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="street" className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Straße</Label>
+                <Input 
+                  id="street"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
+                  placeholder="Musterstraße" 
+                  className="h-12 text-base border-border focus-visible:border-primary rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="houseNumber" className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Hausnummer</Label>
+                <Input 
+                  id="houseNumber"
+                  value={houseNumber}
+                  onChange={(e) => setHouseNumber(e.target.value)}
+                  placeholder="12a" 
+                  className="h-12 text-base border-border focus-visible:border-primary rounded-xl"
+                />
+              </div>
+            </div>
+
+            {/* ZIP Code + City (Grid) */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="zipCode" className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Postleitzahl</Label>
+                <Input 
+                  id="zipCode"
+                  value={zipCode}
+                  onChange={(e) => setZipCode(e.target.value)}
+                  placeholder="1234" 
+                  className="h-12 text-base border-border focus-visible:border-primary rounded-xl"
+                />
+              </div>
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="city" className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Ort</Label>
+                <Input 
+                  id="city"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Musterstadt" 
+                  className="h-12 text-base border-border focus-visible:border-primary rounded-xl"
+                />
+              </div>
+            </div>
+
             {/* Submit */}
             <Button 
               type="submit" 
@@ -497,8 +607,8 @@ export default function ProfilPage() {
                     className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer capitalize"
                   >
                     {availableUnits.map((u) => (
-                      <option key={u} value={u}>
-                        {u === 'flasche' ? '🍺 Flasche' : u === 'kiste' ? '🍻 Kiste' : u === 'dose' ? '🥫 Dose' : u === 'andere' ? '🥤 Andere' : u}
+                      <option key={u.id} value={u.id}>
+                        {u.emoji} {u.label}
                       </option>
                     ))}
                   </select>
