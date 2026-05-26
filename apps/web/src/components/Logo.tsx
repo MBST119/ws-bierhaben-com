@@ -25,12 +25,12 @@ export function Logo({ size = 'md', className = '' }: LogoProps) {
       gap: 'gap-2',
     },
     lg: {
-      svgWidth: 100,
-      svgHeight: 100,
-      textSize: 'text-5xl md:text-6xl',
-      bubblePadding: 'px-6 py-3',
-      bubbleRoundness: 'rounded-3xl border-[6px] md:border-[8px]',
-      gap: 'gap-4',
+      svgWidth: 72,
+      svgHeight: 72,
+      textSize: 'text-4xl md:text-5xl lg:text-6xl',
+      bubblePadding: 'px-4 py-2 md:px-6 md:py-3',
+      bubbleRoundness: 'rounded-2xl md:rounded-3xl border-[4px] md:border-[6px]',
+      gap: 'gap-3 md:gap-4',
     },
   };
 
@@ -128,8 +128,6 @@ export function Logo({ size = 'md', className = '' }: LogoProps) {
           className={`bg-primary text-white ${bubblePadding} ${bubbleRoundness} shadow-sm border-2 md:border-[3px] border-white flex items-center justify-center relative leading-none`}
         >
           <span>bier</span>
-          {/* Little speech bubble tail */}
-          <div className="absolute -bottom-2 right-4 w-4 h-4 bg-primary border-r-2 border-b-2 border-white rotate-45 transform origin-top-left hidden md:block"></div>
         </div>
 
         {/* "haben" in dark blue (or white/light in dark mode) */}

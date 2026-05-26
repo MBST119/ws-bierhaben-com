@@ -15,9 +15,17 @@ jobs:
         env:
           NEXT_PUBLIC_ENV: development
           NEXT_PUBLIC_RECAPTCHA_SITE_KEY: ${{ secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY_DEV || secrets.NEXT_PUBLIC_RECAPTCHA_SITE_KEY }}
+      - run: cd functions && npm ci
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BIERHABEN_COM_DEV }}
           channelId: live
           projectId: bierhaben-com-dev
+      - name: Deploy Cloud Functions
+        uses: w9jds/firebase-action@master
+        with:
+          args: deploy --only functions --project bierhaben-com-dev
+        env:
+          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BIERHABEN_COM_DEV }}
+

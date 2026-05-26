@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type BeerUnit = 'flasche' | 'kiste' | 'dose' | 'andere';
+export type BeerUnit = string;
 
 export type ItemCondition = 'neu' | 'neuwertig' | 'gut' | 'gebraucht';
 
@@ -13,6 +13,10 @@ export interface UserProfile {
   listingsCount?: number;
   exchangesCount?: number;
   role?: 'superAdmin' | 'user';
+  street?: string;
+  houseNumber?: string;
+  zipCode?: string;
+  city?: string;
 }
 
 export interface Listing {
@@ -28,6 +32,9 @@ export interface Listing {
   sellerId: string;
   sellerName: string;
   sellerPhotoURL: string | null;
+  sellerZipCode?: string | null;
+  sellerCity?: string | null;
+  viewsCount?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -44,4 +51,40 @@ export interface Exchange {
   beerUnit: BeerUnit;
   status: 'completed' | 'cancelled';
   createdAt: Timestamp;
+}
+
+/** Level 3: deepest subcategory (no further children) */
+export interface SubSubCategory {
+  id: string;
+  label: string;
+  emoji?: string;
+}
+
+/** Level 2: subcategory with optional sub-subcategories */
+export interface SubCategory {
+  id: string;
+  label: string;
+  emoji?: string;
+  subcategories?: SubSubCategory[];
+}
+
+/** Level 1: top-level category */
+export interface Category {
+  id: string;
+  label: string;
+  emoji?: string;
+  subcategories?: SubCategory[];
+}
+
+export interface Suggestion {
+  id: string;
+  title: string;
+  text: string;
+  categoryId: string;
+  images: string[];
+  userId: string;
+  userName: string;
+  createdAt: Timestamp;
+  isRead: boolean;
+  status: 'pending' | 'done' | 'rejected';
 }

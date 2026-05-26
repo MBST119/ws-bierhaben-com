@@ -12,8 +12,68 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/context/AuthContext';
-import { BeerUnit, ItemCondition } from '@/types';
-import { fetchPaymentUnits } from '@/lib/paymentSettings';
+import { BeerUnit, ItemCondition, Category, SubCategory } from '@/types';
+import { fetchPaymentUnits, PaymentUnit } from '@/lib/paymentSettings';
+import { fetchCategories } from '@/lib/categorySettings';
+
+const compressImage = (file: File): Promise<Blob | File> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width = Math.round((width * MAX_HEIGHT) / height);
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => {
+        resolve(file);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => {
+      resolve(file);
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 
 export default function InserierenPage() {
@@ -26,27 +86,39 @@ export default function InserierenPage() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
+  const [subCategory, setSubCategory] = useState('');
+  const [subSubCategory, setSubSubCategory] = useState('');
   const [price, setPrice] = useState('');
-  const [unit, setUnit] = useState<BeerUnit>('flasche');
+  const [unit, setUnit] = useState<string>('');
   const [condition, setCondition] = useState<ItemCondition | ''>('');
   const [images, setImages] = useState<File[]>([]);
-  const [availableUnits, setAvailableUnits] = useState<string[]>(['flasche', 'kiste', 'dose', 'andere']);
+
+  // Loaded options
+  const [availableUnits, setAvailableUnits] = useState<PaymentUnit[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Derived sub-options based on selected category
+  const selectedCat = categories.find(c => c.id === category);
+  const subCats: SubCategory[] = selectedCat?.subcategories ?? [];
+  const selectedSubCat = subCats.find(s => s.id === subCategory);
+  const subSubCats = selectedSubCat?.subcategories ?? [];
 
   useEffect(() => {
     fetchPaymentUnits().then((fetched) => {
       setAvailableUnits(fetched);
-      if (fetched.length > 0 && !fetched.includes(unit)) {
-        setUnit(fetched[0] as BeerUnit);
-      }
+      if (fetched.length > 0) setUnit(fetched[0].id);
     });
+    fetchCategories().then(setCategories);
   }, []);
 
+  // Reset sub-selections when parent changes
+  useEffect(() => { setSubCategory(''); setSubSubCategory(''); }, [category]);
+  useEffect(() => { setSubSubCategory(''); }, [subCategory]);
+
   useEffect(() => {
-    if (!loading && !user) {
-      router.push('/login');
-    }
+    if (!loading && !user) router.push('/login');
   }, [user, loading, router]);
 
   if (!loading && user && !user.emailVerified) {
@@ -97,21 +169,17 @@ export default function InserierenPage() {
       return;
     }
 
-    if (images.length === 0) {
-      setErrorMsg('Bitte lade mindestens ein Bild hoch.');
-      return;
-    }
-
     setIsUploading(true);
 
     try {
       const uploadedImageUrls: string[] = [];
       const listingId = uuidv4();
 
-      // 1. Upload Images to Firebase Storage
+      // 1. Upload Images to Firebase Storage (only if any selected)
       for (const image of images) {
+        const compressedBlob = await compressImage(image);
         const imageRef = ref(storage, `listings/${listingId}/${uuidv4()}_${image.name}`);
-        const snapshot = await uploadBytes(imageRef, image);
+        const snapshot = await uploadBytes(imageRef, compressedBlob);
         const downloadUrl = await getDownloadURL(snapshot.ref);
         uploadedImageUrls.push(downloadUrl);
       }
@@ -121,6 +189,8 @@ export default function InserierenPage() {
         title,
         description,
         category,
+        subCategory: subCategory || null,
+        subSubCategory: subSubCategory || null,
         beerPrice: parseFloat(price),
         beerUnit: unit,
         condition,
@@ -128,6 +198,8 @@ export default function InserierenPage() {
         sellerId: user.uid,
         sellerName: userProfile?.displayName || user.displayName || user.email?.split('@')[0] || "Anonymer User",
         sellerPhotoURL: userProfile?.photoURL || user.photoURL || null,
+        sellerZipCode: userProfile?.zipCode || null,
+        sellerCity: userProfile?.city || null,
         status: "open",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
@@ -151,6 +223,8 @@ export default function InserierenPage() {
       </div>
     );
   }
+
+  const selectClass = "flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer";
 
   return (
     <div className="w-full max-w-4xl mx-auto pt-10 px-4 pb-24">
@@ -200,25 +274,57 @@ export default function InserierenPage() {
             />
           </div>
 
-          {/* Category */}
-          <div className="space-y-2">
-            <Label htmlFor="category" className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Kategorie *</Label>
+          {/* Category + Sub-categories */}
+          <div className="space-y-3">
+            <Label className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Kategorie *</Label>
+            
+            {/* Main category */}
             <select 
               id="category" 
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer"
+              className={selectClass}
               required
             >
-              <option value="" disabled>Wähle eine Kategorie</option>
-              <option value="moebel">🪑 Möbel</option>
-              <option value="elektronik">📱 Elektronik</option>
-              <option value="kleidung">👕 Kleidung</option>
-              <option value="fahrzeuge">🚗 Fahrzeuge</option>
-              <option value="haushalt">🏠 Haushalt</option>
-              <option value="sport">⚽ Sport</option>
-              <option value="sonstiges">📦 Sonstiges</option>
+              <option value="" disabled>Hauptkategorie wählen</option>
+              {categories.map(cat => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.emoji ? `${cat.emoji} ` : ''}{cat.label}
+                </option>
+              ))}
             </select>
+
+            {/* Sub-category level 1 – only if available */}
+            {category && subCats.length > 0 && (
+              <select
+                value={subCategory}
+                onChange={(e) => setSubCategory(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Sub-Kategorie wählen (optional)</option>
+                {subCats.map(sub => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.emoji ? `${sub.emoji} ` : ''}{sub.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Sub-sub-category level 2 – only if available */}
+            {subCategory && subSubCats.length > 0 && (
+              <select
+                value={subSubCategory}
+                onChange={(e) => setSubSubCategory(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Genauere Kategorie wählen (optional)</option>
+                {subSubCats.map(ss => (
+                  <option key={ss.id} value={ss.id}>
+                    {ss.emoji ? `${ss.emoji} ` : ''}{ss.label}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Price & Unit Grid */}
@@ -243,13 +349,13 @@ export default function InserierenPage() {
               <select 
                 id="unit" 
                 value={unit}
-                onChange={(e) => setUnit(e.target.value as BeerUnit)}
-                className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer capitalize"
+                onChange={(e) => setUnit(e.target.value)}
+                className={selectClass}
                 required
               >
                 {availableUnits.map((u) => (
-                  <option key={u} value={u}>
-                    {u === 'flasche' ? '🍺 Flasche' : u === 'kiste' ? '🍻 Kiste' : u === 'dose' ? '🥫 Dose' : u === 'andere' ? '🥤 Andere' : u}
+                  <option key={u.id} value={u.id}>
+                    {u.emoji} {u.label}
                   </option>
                 ))}
               </select>
@@ -263,7 +369,7 @@ export default function InserierenPage() {
               id="condition" 
               value={condition}
               onChange={(e) => setCondition(e.target.value as ItemCondition)}
-              className="flex h-12 w-full items-center justify-between rounded-xl border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary text-secondary dark:text-foreground font-semibold cursor-pointer"
+              className={selectClass}
               required
             >
               <option value="" disabled>Wähle den Zustand</option>
@@ -274,9 +380,12 @@ export default function InserierenPage() {
             </select>
           </div>
 
-          {/* Images Upload Section */}
+          {/* Images Upload Section – optional */}
           <div className="space-y-2">
-            <Label className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Bilder (max. 10) *</Label>
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-bold text-secondary dark:text-foreground uppercase tracking-wide">Bilder (max. 10)</Label>
+              <span className="text-xs text-muted-foreground font-normal normal-case">(optional)</span>
+            </div>
             
             {images.length > 0 && (
               <div className="flex flex-wrap gap-4 mb-4">
@@ -306,7 +415,7 @@ export default function InserierenPage() {
               >
                 <UploadCloud className="w-8 h-8 text-primary/75 group-hover:text-primary transition-colors mb-2" />
                 <p className="text-sm font-semibold text-secondary dark:text-foreground/90">Dateien per Klick auswählen</p>
-                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, JPEG bis 5MB (mindestens 1 Bild)</p>
+                <p className="text-xs text-muted-foreground mt-1">PNG, JPG, JPEG bis 5MB – Fotos sind optional</p>
                 <input 
                   type="file" 
                   ref={fileInputRef} 

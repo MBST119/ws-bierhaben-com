@@ -9,6 +9,7 @@ import { Logo } from '@/components/Logo';
 import { db } from '@/lib/firebaseClient';
 import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
 import { Listing } from '@/types';
+import { fetchPaymentUnits, PaymentUnit } from '@/lib/paymentSettings';
 
 
 export default function Home() {
@@ -16,9 +17,16 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [availableUnits, setAvailableUnits] = useState<PaymentUnit[]>([]);
+
+  useEffect(() => {
+    fetchPaymentUnits().then(setAvailableUnits);
+  }, []);
 
   // Fetch from Firestore
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchListings() {
       try {
         const q = query(
@@ -26,6 +34,7 @@ export default function Home() {
           limit(100)
         );
         const querySnapshot = await getDocs(q);
+        if (cancelled) return;
         const fetched: Listing[] = [];
         querySnapshot.forEach((doc) => {
           fetched.push({ id: doc.id, ...doc.data() } as Listing);
@@ -47,14 +56,19 @@ export default function Home() {
           setListings(activeListings);
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching listings:', err);
         setListings([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
     fetchListings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Filter listings based on search
@@ -66,12 +80,28 @@ export default function Home() {
     return matchesSearch && matchesCategory;
   });
 
-  const getUnitEmoji = (unit: string) => {
-    switch (unit) {
+  const getUnitEmoji = (unitId: string) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) return found.emoji;
+    switch (unitId) {
       case 'flasche': return '🍺';
       case 'kiste': return '🍻';
       case 'dose': return '🥫';
       default: return '🥤';
+    }
+  };
+
+  const getUnitName = (unitId: string, price: number) => {
+    const found = availableUnits.find(u => u.id === unitId);
+    if (found) {
+      return price > 1 ? (found.labelPlural || found.label) : found.label;
+    }
+    const plural = price > 1;
+    switch (unitId) {
+      case 'flasche': return plural ? 'Flaschen' : 'Flasche';
+      case 'kiste': return plural ? 'Kisten' : 'Kiste';
+      case 'dose': return plural ? 'Dosen' : 'Dose';
+      default: return unitId;
     }
   };
 
@@ -96,8 +126,9 @@ export default function Home() {
         </span>
 
         {/* Big Logo Representation */}
-        <div className="mb-10 flex justify-center">
-          <Logo size="lg" />
+        <div className="mb-8 md:mb-10 flex justify-center w-full">
+          <span className="block md:hidden"><Logo size="md" /></span>
+          <span className="hidden md:block"><Logo size="lg" /></span>
         </div>
 
         {/* Primary Headline */}
@@ -111,19 +142,21 @@ export default function Home() {
         </p>
 
         {/* Hero Quick Action Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full px-4 mb-16">
-          <Link href="/angebote" className="w-full sm:w-auto">
-            <Button size="lg" className="w-full bg-primary hover:bg-primary/90 text-white rounded-full px-8 py-6 text-lg font-semibold shadow-md shadow-primary/20 transition-all hover:scale-105">
-              <Search className="w-5 h-5 mr-2" />
-              Angebote durchsuchen
-            </Button>
-          </Link>
-          <Link href="/inserieren" className="w-full sm:w-auto">
-            <Button size="lg" className="w-full bg-secondary hover:bg-secondary/90 dark:bg-foreground dark:hover:bg-foreground/90 text-white dark:text-background rounded-full px-8 py-6 text-lg font-semibold shadow-md transition-all hover:scale-105">
-              <Plus className="w-5 h-5 mr-2" />
-              Inserat erstellen
-            </Button>
-          </Link>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full px-4 mb-16 relative z-30">
+          <a 
+            href="/angebote" 
+            className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white rounded-full px-8 font-semibold shadow-md shadow-primary/20 transition-all active:scale-95 active:opacity-90 md:hover:scale-105 flex items-center justify-center gap-2 h-14 text-lg"
+          >
+            <Search className="w-5 h-5 shrink-0 pointer-events-none" />
+            Angebote durchsuchen
+          </a>
+          <a 
+            href="/inserieren" 
+            className="w-full sm:w-auto bg-secondary hover:bg-secondary/90 dark:bg-foreground dark:hover:bg-foreground/90 text-white dark:text-background rounded-full px-8 font-semibold shadow-md transition-all active:scale-95 active:opacity-90 md:hover:scale-105 flex items-center justify-center gap-2 h-14 text-lg"
+          >
+            <Plus className="w-5 h-5 shrink-0 pointer-events-none" />
+            Inserat erstellen
+          </a>
         </div>
       </section>
 
@@ -158,11 +191,12 @@ export default function Home() {
           </div>
 
           {/* Action Trigger */}
-          <Link href={`/angebote?q=${searchQuery}&cat=${selectedCategory}`} className="w-full md:w-auto">
-            <Button className="w-full h-12 md:h-12 px-8 rounded-xl md:rounded-full bg-secondary hover:bg-secondary/90 dark:bg-foreground dark:text-background dark:hover:bg-foreground/90 font-bold transition-all shrink-0">
-              Finden
-            </Button>
-          </Link>
+          <a 
+            href={`/angebote?q=${searchQuery}&cat=${selectedCategory}`} 
+            className="w-full md:w-auto bg-secondary hover:bg-secondary/90 dark:bg-foreground dark:text-background dark:hover:bg-foreground/90 text-white dark:text-background rounded-xl md:rounded-full px-8 font-bold transition-all active:scale-95 active:opacity-90 shrink-0 flex items-center justify-center h-12 text-sm"
+          >
+            Finden
+          </a>
         </div>
       </section>
 
@@ -189,7 +223,7 @@ export default function Home() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredListings.map((listing) => (
-              <Link href={`/angebote/detail?id=${listing.id}`} key={listing.id} className="group">
+              <Link href={`/angebote/detail?id=${listing.id}`} key={listing.id} className="group block">
                 <div className="bg-white dark:bg-card border border-border/80 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300 flex flex-col h-full hover:-translate-y-1">
                   
                   {/* Image Container with visual badge */}
@@ -216,7 +250,7 @@ export default function Home() {
                     <div className="absolute bottom-3 left-3 bg-primary text-white px-3.5 py-1.5 rounded-xl shadow-md border border-white/20 flex items-center gap-1.5 font-bold transition-all transform group-hover:scale-105">
                       <span>{listing.beerPrice}x</span>
                       <span className="text-lg">{getUnitEmoji(listing.beerUnit)}</span>
-                      <span className="text-xs uppercase tracking-wide font-extrabold">{listing.beerUnit}</span>
+                      <span className="text-xs uppercase tracking-wide font-extrabold">{getUnitName(listing.beerUnit, listing.beerPrice)}</span>
                     </div>
                   </div>
 
@@ -246,8 +280,12 @@ export default function Home() {
                         <span className="truncate max-w-[90px]">{listing.sellerName}</span>
                       </div>
                       <div className="flex items-center gap-1 font-semibold text-primary/80">
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>AT/DE</span>
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate max-w-[90px]">
+                          {listing.sellerZipCode && listing.sellerCity 
+                            ? `${listing.sellerZipCode} ${listing.sellerCity}` 
+                            : 'AT/DE'}
+                        </span>
                       </div>
                     </div>
                   </div>
