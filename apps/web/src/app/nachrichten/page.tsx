@@ -31,7 +31,8 @@ import {
   Check,
   X,
   Paperclip,
-  Info
+  Info,
+  Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ interface Message {
   offerAmount?: number;
   offerUnit?: string;
   offerStatus?: 'pending' | 'accepted' | 'declined';
+  isDeleted?: boolean;
 }
 
 export default function NachrichtenPage() {
@@ -523,6 +525,35 @@ export default function NachrichtenPage() {
     }
   };
 
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!selectedChatId) return;
+    if (!confirm("Möchtest du diese Nachricht wirklich löschen?")) return;
+    try {
+      const msgRef = doc(db, 'chats', selectedChatId, 'messages', messageId);
+      await updateDoc(msgRef, {
+        isDeleted: true,
+        text: 'Diese Nachricht wurde gelöscht.',
+        imageUrl: null,
+        type: 'text',
+        offerAmount: null,
+        offerUnit: null,
+        offerStatus: null
+      });
+
+      // Update parent chat record if this was the last message
+      if (messages.length > 0 && messages[messages.length - 1].id === messageId) {
+        const chatRef = doc(db, 'chats', selectedChatId);
+        await updateDoc(chatRef, {
+          lastMessage: '🚫 Nachricht gelöscht',
+          updatedAt: serverTimestamp()
+        });
+      }
+    } catch (err) {
+      console.error("Fehler beim Löschen der Nachricht:", err);
+      alert("Fehler beim Löschen der Nachricht.");
+    }
+  };
+
   const getOtherParticipantName = (chat: Chat | null | undefined) => {
     if (!chat || !user) return 'Unbekannt';
     const otherId = chat.participantIds?.find(id => id !== user.uid);
@@ -694,78 +725,101 @@ export default function NachrichtenPage() {
                       );
                     }
 
+                    const bubbleBgClass = msg.isDeleted
+                      ? (isOwn ? 'bg-slate-100 dark:bg-slate-800/60 text-muted-foreground/80 border border-border/20 rounded-br-none' : 'bg-slate-50 dark:bg-card/40 text-muted-foreground/80 border border-border/20 rounded-bl-none')
+                      : (isOwn ? 'bg-primary text-white rounded-br-none' : 'bg-white dark:bg-card text-foreground border border-border/50 rounded-bl-none');
+
                     return (
                       <div 
                         key={msg.id}
                         className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                       >
-                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm text-sm ${isOwn ? 'bg-primary text-white rounded-br-none' : 'bg-white dark:bg-card text-foreground border border-border/50 rounded-bl-none'}`}>
-                          {!isOwn && (
+                        <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 shadow-sm text-sm ${bubbleBgClass}`}>
+                          {!isOwn && !msg.isDeleted && (
                             <span className="block text-[10px] font-bold text-primary mb-0.5">
                               {fetchedNames[msg.senderId] || msg.senderName || 'Nutzer'}
                             </span>
                           )}
 
-                          {msg.imageUrl && (
-                            <div className="mb-2 overflow-hidden rounded-lg max-w-full">
-                              <img src={msg.imageUrl} alt="Bild" className="w-full max-h-60 object-cover rounded-lg border border-border/10" />
-                            </div>
-                          )}
-
-                          {isOffer ? (
-                            <div className="my-1.5 p-3 rounded-xl border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/20 text-foreground dark:text-foreground">
-                              <div className="flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400 mb-1.5 text-xs">
-                                <span>🍻 Preisvorschlag</span>
-                              </div>
-                              <div className="font-extrabold text-base md:text-lg mb-2 text-secondary dark:text-foreground">
-                                {msg.offerAmount} {getOfferUnitLabel(msg.offerUnit || '', msg.offerAmount || 0)}
-                              </div>
-                              
-                              {msg.offerStatus === 'pending' ? (
-                                !isOwn ? (
-                                  <div className="flex gap-2 mt-2">
-                                    <Button
-                                      size="sm"
-                                      variant="default"
-                                      onClick={() => handleUpdateOfferStatus(msg.id, 'accepted', msg.offerAmount || 0, msg.offerUnit || '')}
-                                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-1 h-8 rounded-lg flex items-center gap-1 flex-1 shadow-sm"
-                                    >
-                                      <Check className="w-3.5 h-3.5" /> Akzeptieren
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => handleUpdateOfferStatus(msg.id, 'declined', msg.offerAmount || 0, msg.offerUnit || '')}
-                                      className="font-semibold text-xs py-1 h-8 rounded-lg flex items-center gap-1 flex-1 shadow-sm"
-                                    >
-                                      <X className="w-3.5 h-3.5" /> Ablehnen
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <div className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-100/50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                    Ausstehend
-                                  </div>
-                                )
-                              ) : msg.offerStatus === 'accepted' ? (
-                                <div className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-100/50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">
-                                  <Check className="w-3.5 h-3.5" /> Akzeptiert
-                                </div>
-                              ) : (
-                                <div className="inline-flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold bg-rose-100/50 dark:bg-rose-900/30 px-2.5 py-1 rounded-full">
-                                  <X className="w-3.5 h-3.5" /> Abgelehnt
+                          {msg.isDeleted ? (
+                            <p className="italic text-muted-foreground/75 leading-relaxed break-words flex items-center gap-1.5 select-none">
+                              <span>Diese Nachricht wurde gelöscht.</span>
+                            </p>
+                          ) : (
+                            <>
+                              {msg.imageUrl && (
+                                <div className="mb-2 overflow-hidden rounded-lg max-w-full">
+                                  <img src={msg.imageUrl} alt="Bild" className="w-full max-h-60 object-cover rounded-lg border border-border/10" />
                                 </div>
                               )}
-                            </div>
-                          ) : null}
 
-                          {(!isOffer && msg.text && msg.text !== '[Bild]') && (
-                            <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                              {isOffer ? (
+                                <div className="my-1.5 p-3 rounded-xl border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/20 text-foreground dark:text-foreground">
+                                  <div className="flex items-center gap-1.5 font-bold text-amber-600 dark:text-amber-400 mb-1.5 text-xs">
+                                    <span>🍻 Preisvorschlag</span>
+                                  </div>
+                                  <div className="font-extrabold text-base md:text-lg mb-2 text-secondary dark:text-foreground">
+                                    {msg.offerAmount} {getOfferUnitLabel(msg.offerUnit || '', msg.offerAmount || 0)}
+                                  </div>
+                                  
+                                  {msg.offerStatus === 'pending' ? (
+                                    !isOwn ? (
+                                      <div className="flex gap-2 mt-2">
+                                        <Button
+                                          size="sm"
+                                          variant="default"
+                                          onClick={() => handleUpdateOfferStatus(msg.id, 'accepted', msg.offerAmount || 0, msg.offerUnit || '')}
+                                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs py-1 h-8 rounded-lg flex items-center gap-1 flex-1 shadow-sm"
+                                        >
+                                          <Check className="w-3.5 h-3.5" /> Akzeptieren
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => handleUpdateOfferStatus(msg.id, 'declined', msg.offerAmount || 0, msg.offerUnit || '')}
+                                          className="font-semibold text-xs py-1 h-8 rounded-lg flex items-center gap-1 flex-1 shadow-sm"
+                                        >
+                                          <X className="w-3.5 h-3.5" /> Ablehnen
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="inline-flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-semibold bg-amber-100/50 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                        Ausstehend
+                                      </div>
+                                    )
+                                  ) : msg.offerStatus === 'accepted' ? (
+                                    <div className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-100/50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">
+                                      <Check className="w-3.5 h-3.5" /> Akzeptiert
+                                    </div>
+                                  ) : (
+                                    <div className="inline-flex items-center gap-1.5 text-xs text-rose-600 dark:text-rose-400 font-semibold bg-rose-100/50 dark:bg-rose-900/30 px-2.5 py-1 rounded-full">
+                                      <X className="w-3.5 h-3.5" /> Abgelehnt
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+
+                              {(!isOffer && msg.text && msg.text !== '[Bild]') && (
+                                <p className="whitespace-pre-wrap leading-relaxed break-words">{msg.text}</p>
+                              )}
+                            </>
                           )}
 
-                          <span className={`block text-[9px] text-right mt-1 ${isOwn ? 'text-white/70' : 'text-muted-foreground'}`}>
-                            {formatTime(msg.createdAt)}
-                          </span>
+                          <div className="flex items-center justify-end gap-1.5 mt-1 select-none">
+                            <span className={`block text-[9px] ${msg.isDeleted ? 'text-muted-foreground/50' : (isOwn ? 'text-white/70' : 'text-muted-foreground')}`}>
+                              {formatTime(msg.createdAt)}
+                            </span>
+                            {isOwn && !msg.isDeleted && (
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="text-white/60 hover:text-white dark:text-muted-foreground dark:hover:text-foreground cursor-pointer transition-colors"
+                                title="Nachricht löschen"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
