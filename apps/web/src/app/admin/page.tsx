@@ -14,7 +14,7 @@ import {
   GripVertical, History, Mail, Layers
 } from 'lucide-react';
 import { db } from '@/lib/firebaseClient';
-import { collection, query, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { fetchSuggestionCategories, saveSuggestionCategories, SuggestionCategory } from '@/lib/suggestionSettings';
 
 type AdminTab = 'units' | 'categories' | 'changelog' | 'suggestions' | 'suggestionCategories';
@@ -159,7 +159,7 @@ function SubSubRow({ item, onUpdate, onDelete }: {
           <>
             <span className="text-base">{item.emoji}</span>
             <span className="text-sm text-foreground flex-1">{item.label}</span>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button onClick={() => setEditing(true)} className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"><Pencil className="w-3.5 h-3.5" /></button>
               <button onClick={() => setConfirmDelete(true)} className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
@@ -216,7 +216,7 @@ function SubRow({ item, onUpdate, onDelete }: {
               <span className="text-base">{item.emoji}</span>
               <span className="text-sm font-semibold text-foreground flex-1">{item.label}</span>
               <span className="text-xs text-muted-foreground mr-2">{subs.length} Sub-Kategorien</span>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button onClick={() => { setExpanded(true); setAddingSubSub(true); }} className="p-1 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all" title="Sub-Sub-Kategorie hinzufügen"><Plus className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setEditing(true)} className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setConfirmDelete(true)} className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -303,7 +303,7 @@ function CategoryCard({ cat, onUpdate, onDelete }: {
               <span className="text-xl">{cat.emoji}</span>
               <span className="font-bold text-foreground flex-1">{cat.label}</span>
               <span className="text-xs text-muted-foreground mr-2">{subs.length} Sub-Kategorien</span>
-              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button onClick={() => { setExpanded(true); setAddingSub(true); }} className="p-1.5 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all" title="Sub-Kategorie hinzufügen"><Plus className="w-4 h-4" /></button>
                 <button onClick={() => setEditing(true)} className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all" title="Bearbeiten"><Pencil className="w-4 h-4" /></button>
                 {!isSonstiges && (
@@ -357,6 +357,19 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG_DATA: ChangelogEntry[] = [
+  {
+    version: 'v1.5.0',
+    date: '26. Mai 2026',
+    type: 'Update',
+    changes: [
+      'Chat-Nachrichten löschen: Implementierung einer datenschutzkonformen Löschfunktion. Sensible Nachrichtendaten wie Text, Bilder und Vorschläge werden direkt in der Firestore-Datenbank überschrieben und durch den Platzhalter "*Diese Nachricht wurde gelöscht.*" ersetzt.',
+      'Chat-Snippet-Aktualisierung: Automatisches Aktualisieren der linken Chatliste auf "🚫 Nachricht gelöscht", falls die gelöschte Nachricht die letzte Nachricht der Unterhaltung war.',
+      'Verbesserungsvorschläge verwalten: Super-Admins können eingegangene Verbesserungsvorschläge direkt in den App-Einstellungen bearbeiten (inline Titel, Text, Kategorie-Dropdown) und dauerhaft löschen.',
+      'Mobile Bedienbarkeit optimiert: Deaktivierung von reinem Hover-Zwang für Editier- und Löschaktionen in den App-Einstellungen (Tauscheinheiten, Kategorien, Vorschlags-Kategorien) – Steuerelemente sind auf Mobilgeräten nun immer direkt sichtbar.',
+      'iOS Tastatur & Zoom-Fix: Systemweite Anpassung der Viewport-Meta-Tags und Anheben der Input-Schriftgrößen auf 16px (text-base), um störendes automatisches Hineinzoomen beim Fokussieren von Eingabefeldern dauerhaft zu unterbinden.',
+      'Menge-Eingabefeld im Chat: Vergrößerung und Zentrierung des Menge-Eingabefelds (`w-24`, `text-base font-bold`) im Preisvorschlags-Panel des Chats zur Vermeidung von Layout-Überlagerungen durch mobile Standard-Spinner.'
+    ]
+  },
   {
     version: 'v1.4.0',
     date: '26. Mai 2026',
@@ -446,6 +459,10 @@ export default function AdminPage() {
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [suggestFilter, setSuggestFilter] = useState<'all' | 'unread' | 'pending'>('all');
   const [showDoneRejected, setShowDoneRejected] = useState(false);
+  const [editingSuggestId, setEditingSuggestId] = useState<string | null>(null);
+  const [editSuggestTitle, setEditSuggestTitle] = useState('');
+  const [editSuggestText, setEditSuggestText] = useState('');
+  const [editSuggestCategoryId, setEditSuggestCategoryId] = useState('');
 
   // ─── Suggestion Categories state ───
   const [suggestionCats, setSuggestionCats] = useState<SuggestionCategory[]>([]);
@@ -569,6 +586,53 @@ export default function AdminPage() {
     } catch (err: any) {
       console.error("Fehler beim Aktualisieren des Vorschlags:", err);
       setErrorMsg("Fehler beim Aktualisieren: " + err.message);
+    }
+  };
+
+  const handleStartEditSuggestion = (s: Suggestion) => {
+    setEditingSuggestId(s.id);
+    setEditSuggestTitle(s.title);
+    setEditSuggestText(s.text);
+    setEditSuggestCategoryId(s.categoryId);
+  };
+
+  const handleSaveSuggestionEdit = async (id: string) => {
+    if (!editSuggestTitle.trim() || !editSuggestText.trim()) {
+      alert("Titel und Text dürfen nicht leer sein.");
+      return;
+    }
+    setIsSaving(true);
+    clearMessages();
+    try {
+      const docRef = doc(db, 'suggestions', id);
+      const updates = {
+        title: editSuggestTitle.trim(),
+        text: editSuggestText.trim(),
+        categoryId: editSuggestCategoryId
+      };
+      await updateDoc(docRef, updates);
+      setSuggestions(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      setEditingSuggestId(null);
+      setSuccessMsg('Vorschlag erfolgreich aktualisiert!');
+    } catch (err: any) {
+      console.error("Fehler beim Bearbeiten des Vorschlags:", err);
+      setErrorMsg("Fehler beim Speichern: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteSuggestion = async (id: string) => {
+    if (!confirm("Möchtest du diesen Vorschlag wirklich unwiderruflich löschen?")) return;
+    clearMessages();
+    try {
+      const docRef = doc(db, 'suggestions', id);
+      await deleteDoc(docRef);
+      setSuggestions(prev => prev.filter(s => s.id !== id));
+      setSuccessMsg('Vorschlag erfolgreich gelöscht!');
+    } catch (err: any) {
+      console.error("Fehler beim Löschen des Vorschlags:", err);
+      setErrorMsg("Fehler beim Löschen: " + err.message);
     }
   };
 
@@ -834,122 +898,201 @@ export default function AdminPage() {
                                 !s.isRead ? 'border-primary/45 ring-1 ring-primary/20 shadow-md shadow-primary/5' : 'border-border/80'
                               }`}
                             >
-                              
-                              {/* Header info */}
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-lg font-extrabold text-foreground">{s.title}</span>
-                                  <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <span>{getSuggestCatEmoji(s.categoryId)}</span>
-                                    <span>{getSuggestCatLabel(s.categoryId)}</span>
-                                  </span>
-                                </div>
-                                <span className="text-xs text-muted-foreground font-medium">
-                                  {s.createdAt && typeof s.createdAt.toDate === 'function' 
-                                    ? s.createdAt.toDate().toLocaleString('de-DE') 
-                                    : 'Kürzlich'}
-                                </span>
-                              </div>
+                              {editingSuggestId === s.id ? (
+                                <div className="space-y-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="space-y-1">
+                                      <label className="text-xs font-bold text-muted-foreground uppercase">Titel</label>
+                                      <Input
+                                        value={editSuggestTitle}
+                                        onChange={(e) => setEditSuggestTitle(e.target.value)}
+                                        className="font-semibold text-sm"
+                                      />
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="text-xs font-bold text-muted-foreground uppercase">Kategorie</label>
+                                      <select
+                                        value={editSuggestCategoryId}
+                                        onChange={(e) => setEditSuggestCategoryId(e.target.value)}
+                                        className="w-full h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-sm font-semibold text-foreground"
+                                      >
+                                        {suggestionCats.map((cat) => (
+                                          <option key={cat.id} value={cat.id}>
+                                            {cat.emoji} {cat.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
 
-                              {/* Text */}
-                              <p className="text-sm text-secondary/90 dark:text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                                {s.text}
-                              </p>
+                                  <div className="space-y-1">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase">Vorschlagstext</label>
+                                    <textarea
+                                      value={editSuggestText}
+                                      onChange={(e) => setEditSuggestText(e.target.value)}
+                                      rows={4}
+                                      className="w-full p-3 rounded-lg border border-input bg-transparent text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary text-foreground leading-relaxed resize-none"
+                                    />
+                                  </div>
 
-                              {/* Images preview */}
-                              {s.images && s.images.length > 0 && (
-                                <div className="flex flex-wrap gap-2">
-                                  {s.images.map((url, idx) => (
-                                    <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block w-20 h-20 rounded-xl overflow-hidden border border-border/80 hover:border-primary/50 transition-all">
-                                      <img src={url} alt="" className="w-full h-full object-cover" />
-                                    </a>
-                                  ))}
+                                  <div className="flex justify-end gap-2 pt-2 border-t border-border/40">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleSaveSuggestionEdit(s.id)}
+                                      disabled={isSaving}
+                                      className="bg-primary hover:bg-primary/90 text-white font-bold h-9 px-4 rounded-lg flex items-center gap-1 shadow-sm text-xs cursor-pointer"
+                                    >
+                                      {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                      Speichern
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setEditingSuggestId(null)}
+                                      className="h-9 px-4 rounded-lg text-xs cursor-pointer"
+                                    >
+                                      Abbrechen
+                                    </Button>
+                                  </div>
                                 </div>
+                              ) : (
+                                <>
+                                  {/* Header info */}
+                                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg font-extrabold text-foreground">{s.title}</span>
+                                      <span className="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                        <span>{getSuggestCatEmoji(s.categoryId)}</span>
+                                        <span>{getSuggestCatLabel(s.categoryId)}</span>
+                                      </span>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground font-medium">
+                                      {s.createdAt && typeof s.createdAt.toDate === 'function' 
+                                        ? s.createdAt.toDate().toLocaleString('de-DE') 
+                                        : 'Kürzlich'}
+                                    </span>
+                                  </div>
+
+                                  {/* Text */}
+                                  <p className="text-sm text-secondary/90 dark:text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                                    {s.text}
+                                  </p>
+
+                                  {/* Images preview */}
+                                  {s.images && s.images.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                      {s.images.map((url, idx) => (
+                                        <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="block w-20 h-20 rounded-xl overflow-hidden border border-border/80 hover:border-primary/50 transition-all">
+                                          <img src={url} alt="" className="w-full h-full object-cover" />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+
+                                  {/* Creator info & badges */}
+                                  <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border/40 text-xs">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                      <span>Vorgeschlagen von:</span>
+                                      <span className="font-bold text-foreground">{s.userName}</span>
+                                    </div>
+                                    
+                                    {/* Badges */}
+                                    <div className="flex items-center gap-2">
+                                      {/* Read Status Badge */}
+                                      <span className={`px-2.5 py-1 rounded-full font-bold uppercase tracking-wide text-[10px] border ${
+                                        s.isRead 
+                                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' 
+                                          : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                                      }`}>
+                                        {s.isRead ? 'Gelesen' : 'Ungelesen'}
+                                      </span>
+                                      
+                                      {/* Process Status Badge */}
+                                      <span className={`px-2.5 py-1 rounded-full font-bold uppercase tracking-wide text-[10px] border ${
+                                        s.status === 'done'
+                                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                          : s.status === 'rejected'
+                                          ? 'bg-destructive/10 text-destructive border-destructive/20'
+                                          : 'bg-slate-500/10 text-slate-600 border-slate-500/20'
+                                      }`}>
+                                        {s.status === 'done' ? 'Gemacht' : s.status === 'rejected' ? 'Abgelehnt' : 'Ausstehend'}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Action buttons row */}
+                                  <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border/40">
+                                    
+                                    {/* Read/Unread toggle & edit/delete */}
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => handleUpdateSuggestionStatus(s.id, { isRead: !s.isRead })}
+                                        className="text-xs h-9 border-border/80 text-secondary dark:text-foreground active:scale-95 active:opacity-90 px-3 cursor-pointer"
+                                      >
+                                        Als {s.isRead ? 'ungelesen' : 'gelesen'} markieren
+                                      </Button>
+
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => handleStartEditSuggestion(s)}
+                                        className="text-xs h-9 border-border/80 text-secondary dark:text-foreground active:scale-95 active:opacity-90 px-3 cursor-pointer flex items-center gap-1.5"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 text-primary" />
+                                        Bearbeiten
+                                      </Button>
+
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={() => handleDeleteSuggestion(s.id)}
+                                        className="text-xs h-9 border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive active:scale-95 active:opacity-90 px-3 cursor-pointer flex items-center gap-1.5"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Löschen
+                                      </Button>
+                                      
+                                      {s.status !== 'pending' && (
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          onClick={() => handleUpdateSuggestionStatus(s.id, { status: 'pending' })}
+                                          className="text-xs h-9 text-muted-foreground hover:bg-muted active:scale-95 active:opacity-90 cursor-pointer"
+                                        >
+                                          Status zurücksetzen
+                                        </Button>
+                                      )}
+                                    </div>
+
+                                    {/* Decision Actions Group (Erledigt / Ablehnen) */}
+                                    <div className="flex items-center gap-2 bg-slate-50/80 dark:bg-card/45 border border-border/60 p-1.5 rounded-xl shadow-inner shrink-0">
+                                      {s.status !== 'done' && (
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm" 
+                                          onClick={() => handleUpdateSuggestionStatus(s.id, { status: 'done', isRead: true })}
+                                          className="text-xs h-8 text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-500/20 dark:border-emerald-500/30 active:scale-95 active:opacity-90 font-extrabold px-3.5 cursor-pointer"
+                                        >
+                                          ✓ Erledigt
+                                        </Button>
+                                      )}
+                                      {s.status !== 'rejected' && (
+                                        <Button 
+                                          variant="outline" 
+                                          size="sm" 
+                                          onClick={() => handleUpdateSuggestionStatus(s.id, { status: 'rejected', isRead: true })}
+                                          className="text-xs h-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10 border-destructive/20 active:scale-95 active:opacity-90 font-extrabold px-3.5 cursor-pointer"
+                                        >
+                                          ✕ Ablehnen
+                                        </Button>
+                                      )}
+                                    </div>
+
+                                  </div>
+                                </>
                               )}
-
-                              {/* Creator info & badges */}
-                              <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border/40 text-xs">
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                  <span>Vorgeschlagen von:</span>
-                                  <span className="font-bold text-foreground">{s.userName}</span>
-                                </div>
-                                
-                                {/* Badges */}
-                                <div className="flex items-center gap-2">
-                                  {/* Read Status Badge */}
-                                  <span className={`px-2.5 py-1 rounded-full font-bold uppercase tracking-wide text-[10px] border ${
-                                    s.isRead 
-                                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' 
-                                      : 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                                  }`}>
-                                    {s.isRead ? 'Gelesen' : 'Ungelesen'}
-                                  </span>
-                                  
-                                  {/* Process Status Badge */}
-                                  <span className={`px-2.5 py-1 rounded-full font-bold uppercase tracking-wide text-[10px] border ${
-                                    s.status === 'done'
-                                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                      : s.status === 'rejected'
-                                      ? 'bg-destructive/10 text-destructive border-destructive/20'
-                                      : 'bg-slate-500/10 text-slate-600 border-slate-500/20'
-                                  }`}>
-                                    {s.status === 'done' ? 'Gemacht' : s.status === 'rejected' ? 'Abgelehnt' : 'Ausstehend'}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Action buttons row */}
-                              <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-border/40">
-                                
-                                {/* Read/Unread toggle & reset */}
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={() => handleUpdateSuggestionStatus(s.id, { isRead: !s.isRead })}
-                                    className="text-xs h-9 border-border/80 text-secondary dark:text-foreground active:scale-95 active:opacity-90 px-3 cursor-pointer"
-                                  >
-                                    Als {s.isRead ? 'ungelesen' : 'gelesen'} markieren
-                                  </Button>
-                                  
-                                  {s.status !== 'pending' && (
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm" 
-                                      onClick={() => handleUpdateSuggestionStatus(s.id, { status: 'pending' })}
-                                      className="text-xs h-9 text-muted-foreground hover:bg-muted active:scale-95 active:opacity-90 cursor-pointer"
-                                    >
-                                      Status zurücksetzen
-                                    </Button>
-                                  )}
-                                </div>
-
-                                {/* Decision Actions Group (Erledigt / Ablehnen) */}
-                                <div className="flex items-center gap-2 bg-slate-50/80 dark:bg-card/45 border border-border/60 p-1.5 rounded-xl shadow-inner shrink-0">
-                                  {s.status !== 'done' && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={() => handleUpdateSuggestionStatus(s.id, { status: 'done', isRead: true })}
-                                      className="text-xs h-8 text-emerald-600 dark:text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 border-emerald-500/20 dark:border-emerald-500/30 active:scale-95 active:opacity-90 font-extrabold px-3.5 cursor-pointer"
-                                    >
-                                      ✓ Erledigt
-                                    </Button>
-                                  )}
-                                  {s.status !== 'rejected' && (
-                                    <Button 
-                                      variant="outline" 
-                                      size="sm" 
-                                      onClick={() => handleUpdateSuggestionStatus(s.id, { status: 'rejected', isRead: true })}
-                                      className="text-xs h-8 text-destructive hover:text-destructive/90 hover:bg-destructive/10 border-destructive/20 active:scale-95 active:opacity-90 font-extrabold px-3.5 cursor-pointer"
-                                    >
-                                      ✕ Ablehnen
-                                    </Button>
-                                  )}
-                                </div>
-
-                              </div>
-
                             </div>
                           ))}
                         </div>
@@ -1018,7 +1161,7 @@ export default function AdminPage() {
                             <span className="font-medium text-foreground flex-1">
                               {cat.label}
                             </span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <button
                                 type="button"
                                 onClick={() => setEditingSuggestCatId(cat.id)}
@@ -1118,7 +1261,7 @@ export default function AdminPage() {
                             <span className="font-medium text-foreground flex-1">
                               {unit.label} <span className="text-xs text-muted-foreground">({unit.labelPlural || unit.label})</span>
                             </span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <button
                                 type="button"
                                 onClick={() => setEditingUnitId(unit.id)}
