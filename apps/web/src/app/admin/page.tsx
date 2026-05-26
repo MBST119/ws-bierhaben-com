@@ -358,6 +358,19 @@ interface ChangelogEntry {
 
 const CHANGELOG_DATA: ChangelogEntry[] = [
   {
+    version: 'v1.5.0',
+    date: '26. Mai 2026',
+    type: 'Update',
+    changes: [
+      'Chat-Nachrichten löschen: Implementierung einer datenschutzkonformen Löschfunktion. Sensible Nachrichtendaten wie Text, Bilder und Vorschläge werden direkt in der Firestore-Datenbank überschrieben und durch den Platzhalter "*Diese Nachricht wurde gelöscht.*" ersetzt.',
+      'Chat-Snippet-Aktualisierung: Automatisches Aktualisieren der linken Chatliste auf "🚫 Nachricht gelöscht", falls die gelöschte Nachricht die letzte Nachricht der Unterhaltung war.',
+      'Verbesserungsvorschläge verwalten: Super-Admins können eingegangene Verbesserungsvorschläge direkt in den App-Einstellungen bearbeiten (inline Titel, Text, Kategorie-Dropdown) und dauerhaft löschen.',
+      'Mobile Bedienbarkeit optimiert: Deaktivierung von reinem Hover-Zwang für Editier- und Löschaktionen in den App-Einstellungen (Tauscheinheiten, Kategorien, Vorschlags-Kategorien) – Steuerelemente sind auf Mobilgeräten nun immer direkt sichtbar.',
+      'iOS Tastatur & Zoom-Fix: Systemweite Anpassung der Viewport-Meta-Tags und Anheben der Input-Schriftgrößen auf 16px (text-base), um störendes automatisches Hineinzoomen beim Fokussieren von Eingabefeldern dauerhaft zu unterbinden.',
+      'Menge-Eingabefeld im Chat: Vergrößerung und Zentrierung des Menge-Eingabefelds (`w-24`, `text-base font-bold`) im Preisvorschlags-Panel des Chats zur Vermeidung von Layout-Überlagerungen durch mobile Standard-Spinner.'
+    ]
+  },
+  {
     version: 'v1.4.0',
     date: '26. Mai 2026',
     type: 'Update',
