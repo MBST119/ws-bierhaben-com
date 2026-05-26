@@ -791,13 +791,13 @@ export default function NachrichtenPage() {
                       placeholder="Menge"
                       value={suggestedAmount}
                       onChange={(e) => setSuggestedAmount(e.target.value)}
-                      className="w-20 h-10 rounded-lg text-sm bg-white dark:bg-card border-amber-500/20"
+                      className="w-24 h-10 rounded-lg text-base font-bold text-center bg-white dark:bg-card border-amber-500/40 text-foreground dark:text-foreground focus-visible:border-amber-500 focus-visible:ring-1 focus-visible:ring-amber-500"
                     />
                     
                     <select
                       value={suggestedUnit}
                       onChange={(e: any) => setSuggestedUnit(e.target.value)}
-                      className="h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-sm font-semibold focus:outline-none focus:ring-1 focus:ring-primary border-amber-500/20 text-foreground dark:text-foreground capitalize"
+                      className="h-10 px-3 rounded-lg border border-input bg-white dark:bg-card text-base font-bold focus:outline-none focus:ring-1 focus:ring-primary border-amber-500/40 text-foreground dark:text-foreground capitalize"
                     >
                       {availableUnits.map((u) => (
                         <option key={u.id} value={u.id}>
