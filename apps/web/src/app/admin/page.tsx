@@ -159,7 +159,7 @@ function SubSubRow({ item, onUpdate, onDelete }: {
           <>
             <span className="text-base">{item.emoji}</span>
             <span className="text-sm text-foreground flex-1">{item.label}</span>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <button onClick={() => setEditing(true)} className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"><Pencil className="w-3.5 h-3.5" /></button>
               <button onClick={() => setConfirmDelete(true)} className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
@@ -216,7 +216,7 @@ function SubRow({ item, onUpdate, onDelete }: {
               <span className="text-base">{item.emoji}</span>
               <span className="text-sm font-semibold text-foreground flex-1">{item.label}</span>
               <span className="text-xs text-muted-foreground mr-2">{subs.length} Sub-Kategorien</span>
-              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button onClick={() => { setExpanded(true); setAddingSubSub(true); }} className="p-1 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all" title="Sub-Sub-Kategorie hinzufügen"><Plus className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setEditing(true)} className="p-1 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"><Pencil className="w-3.5 h-3.5" /></button>
                 <button onClick={() => setConfirmDelete(true)} className="p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
@@ -303,7 +303,7 @@ function CategoryCard({ cat, onUpdate, onDelete }: {
               <span className="text-xl">{cat.emoji}</span>
               <span className="font-bold text-foreground flex-1">{cat.label}</span>
               <span className="text-xs text-muted-foreground mr-2">{subs.length} Sub-Kategorien</span>
-              <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="flex items-center gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                 <button onClick={() => { setExpanded(true); setAddingSub(true); }} className="p-1.5 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-all" title="Sub-Kategorie hinzufügen"><Plus className="w-4 h-4" /></button>
                 <button onClick={() => setEditing(true)} className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all" title="Bearbeiten"><Pencil className="w-4 h-4" /></button>
                 {!isSonstiges && (
@@ -1148,7 +1148,7 @@ export default function AdminPage() {
                             <span className="font-medium text-foreground flex-1">
                               {cat.label}
                             </span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <button
                                 type="button"
                                 onClick={() => setEditingSuggestCatId(cat.id)}
@@ -1248,7 +1248,7 @@ export default function AdminPage() {
                             <span className="font-medium text-foreground flex-1">
                               {unit.label} <span className="text-xs text-muted-foreground">({unit.labelPlural || unit.label})</span>
                             </span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                               <button
                                 type="button"
                                 onClick={() => setEditingUnitId(unit.id)}
